@@ -30,7 +30,10 @@ export function usePitchTracker(): PitchTrackerState {
     async function start() {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        if (cancelled) return;
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
 
         audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(stream);
