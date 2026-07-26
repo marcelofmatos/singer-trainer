@@ -1,5 +1,5 @@
 // frontend/src/components/ExercisePlayer.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { noteAtTime } from '../lib/exerciseTiming';
 import { playExerciseTone } from '../audio/referenceTone';
@@ -13,12 +13,10 @@ export interface ExercisePlayerProps {
 
 export function ExercisePlayer({ exercise, onExit }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const pitchTracker = usePitchTracker();
 
   useEffect(() => {
     const audioContext = new AudioContext();
-    audioContextRef.current = audioContext;
     const oscillator = playExerciseTone(audioContext, exercise);
 
     const startedAt = performance.now();
