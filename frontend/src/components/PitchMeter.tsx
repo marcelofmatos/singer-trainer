@@ -79,9 +79,17 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
           <circle
             cx={indicatorPosition.x}
             cy={indicatorPosition.y}
-            r={INDICATOR_RADIUS + 2}
+            r={INDICATOR_RADIUS + 4}
             fill="none"
             stroke="#ffffff"
+            strokeWidth={2}
+          />
+          <circle
+            cx={indicatorPosition.x}
+            cy={indicatorPosition.y}
+            r={INDICATOR_RADIUS + 2}
+            fill="none"
+            stroke="#000000"
             strokeWidth={2}
           />
           <circle
