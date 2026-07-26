@@ -313,6 +313,7 @@ Expected: FAIL — the old text/bar implementation doesn't render any `note-bubb
 import {
   CHROMATIC_NOTE_COLORS,
   CHROMATIC_NOTE_NAMES,
+  DEGREES_PER_SEMITONE,
   angleForPitch,
   pitchClassIndex,
   pointOnCircle,
@@ -359,7 +360,7 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
   return (
     <svg viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`} width="100%" role="img" aria-label="Roda cromática de afinação">
       {CHROMATIC_NOTE_NAMES.map((name, index) => {
-        const { x, y } = pointOnCircle(index * 30, WHEEL_RADIUS, CENTER);
+        const { x, y } = pointOnCircle(index * DEGREES_PER_SEMITONE, WHEEL_RADIUS, CENTER);
         const isTarget = targetPitchClass === index;
         const color = CHROMATIC_NOTE_COLORS[index];
         return (
