@@ -97,8 +97,6 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
             cy={indicatorPosition.y}
             r={INDICATOR_RADIUS}
             fill={STATUS_COLORS[status]}
-            stroke="#000000"
-            strokeWidth={1.5}
           />
         </g>
       )}
