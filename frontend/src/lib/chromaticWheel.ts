@@ -15,7 +15,7 @@ export const CHROMATIC_NOTE_COLORS = [
   '#3C3CDD', '#8C3CDD', '#DD3CDD', '#DD3C8C',
 ];
 
-const DEGREES_PER_SEMITONE = 30;
+export const DEGREES_PER_SEMITONE = 30;
 
 /** Maps a MIDI note number to its pitch class (0=C .. 11=B), ignoring octave. */
 export function pitchClassIndex(midiNumber: number): number {
@@ -51,11 +51,28 @@ export function pointOnCircle(angleDegrees: number, radius: number, center: Poin
   };
 }
 
-/** Picks black or white text for readable contrast on a given hex background color. */
+function srgbToLinear(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+function relativeLuminance(r: number, g: number, b: number): number {
+  return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+}
+
+function contrastRatio(l1: number, l2: number): number {
+  const lighter = Math.max(l1, l2);
+  const darker = Math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** Picks black or white text for the highest WCAG contrast on a given hex background. */
 export function readableTextColor(hex: string): '#000000' | '#ffffff' {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
-  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-  return brightness >= 128 ? '#000000' : '#ffffff';
+  const backgroundLuminance = relativeLuminance(r, g, b);
+  const contrastWithBlack = contrastRatio(backgroundLuminance, relativeLuminance(0, 0, 0));
+  const contrastWithWhite = contrastRatio(backgroundLuminance, relativeLuminance(255, 255, 255));
+  return contrastWithBlack >= contrastWithWhite ? '#000000' : '#ffffff';
 }

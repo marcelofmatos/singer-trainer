@@ -76,6 +76,12 @@ describe('pointOnCircle', () => {
     expect(point.x).toBeCloseTo(0, 5);
     expect(point.y).toBeCloseTo(100, 5);
   });
+
+  it('places 45 degrees in the upper-right quadrant (clockwise from top)', () => {
+    const point = pointOnCircle(45, 100, center);
+    expect(point.x).toBeCloseTo(170.71, 1);
+    expect(point.y).toBeCloseTo(29.29, 1);
+  });
 });
 
 describe('CHROMATIC_NOTE_NAMES / CHROMATIC_NOTE_COLORS', () => {
@@ -94,5 +100,10 @@ describe('readableTextColor', () => {
 
   it('picks light text on a dark/saturated background', () => {
     expect(readableTextColor('#3C3CDD')).toBe('#ffffff'); // deep blue
+  });
+
+  it('picks black text even for mid-brightness saturated colors where luma heuristics misfire', () => {
+    expect(readableTextColor('#3C8CDD')).toBe('#000000'); // G — luma heuristic wrongly picked white here
+    expect(readableTextColor('#DD3CDD')).toBe('#000000'); // A# — same issue
   });
 });
