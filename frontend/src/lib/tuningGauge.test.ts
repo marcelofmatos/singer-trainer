@@ -28,9 +28,11 @@ describe('tuningStatus', () => {
     expect(tuningStatus(-10)).toBe('in-tune');
   });
 
-  it('is "close" between 10 and 25 cents', () => {
+  it('is "close" between 10 and 25 cents, inclusive of the 25 boundary', () => {
     expect(tuningStatus(15)).toBe('close');
     expect(tuningStatus(-20)).toBe('close');
+    expect(tuningStatus(25)).toBe('close');
+    expect(tuningStatus(-25)).toBe('close');
   });
 
   it('is "off" beyond 25 cents', () => {
