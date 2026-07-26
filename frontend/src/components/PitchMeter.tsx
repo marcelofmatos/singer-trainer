@@ -59,7 +59,7 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
               cy={y}
               r={isTarget ? BUBBLE_RADIUS + 4 : BUBBLE_RADIUS}
               fill={color}
-              stroke={isTarget ? '#ffffff' : 'none'}
+              stroke={isTarget ? '#000000' : 'none'}
               strokeWidth={isTarget ? 3 : 0}
             />
             <text
