@@ -4,6 +4,7 @@ build/
 .env
 .env.local
 *.log
+*.tsbuildinfo
 
 # Python
 __pycache__/
