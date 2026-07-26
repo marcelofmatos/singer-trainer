@@ -39,7 +39,9 @@ export const BUILTIN_EXERCISES: Exercise[] = [
     id: 'sirene',
     name: 'Sirene',
     category: 'aquecimento',
-    description: 'Deslize a voz de Dó4 até Dó5 e volta, suave e contínuo, para soltar a laringe.',
+    description:
+      'Deslize a voz suavemente do Dó4 até o Dó5 e volta; o tom de referência marca só o início, ' +
+      'o topo e o fim do percurso, para soltar a laringe.',
     notes: [
       { midiNumber: MIDDLE_C, startTime: 0, duration: 2 },
       { midiNumber: MIDDLE_C + 12, startTime: 2, duration: 2 },
