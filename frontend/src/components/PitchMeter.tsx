@@ -54,14 +54,13 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
         const color = CHROMATIC_NOTE_COLORS[index];
         return (
           <g key={name} data-testid={`note-bubble-${name}`} data-active={isTarget ? 'true' : 'false'}>
-            <circle
-              cx={x}
-              cy={y}
-              r={isTarget ? BUBBLE_RADIUS + 4 : BUBBLE_RADIUS}
-              fill={color}
-              stroke={isTarget ? '#000000' : 'none'}
-              strokeWidth={isTarget ? 3 : 0}
-            />
+            {isTarget && (
+              <>
+                <circle cx={x} cy={y} r={BUBBLE_RADIUS + 6} fill="none" stroke="#ffffff" strokeWidth={2} />
+                <circle cx={x} cy={y} r={BUBBLE_RADIUS + 4} fill="none" stroke="#000000" strokeWidth={2} />
+              </>
+            )}
+            <circle cx={x} cy={y} r={BUBBLE_RADIUS} fill={color} />
             <text
               x={x}
               y={y}
@@ -76,16 +75,24 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
         );
       })}
       {indicatorPosition && status && (
-        <circle
-          data-testid="live-indicator"
-          data-status={status}
-          cx={indicatorPosition.x}
-          cy={indicatorPosition.y}
-          r={INDICATOR_RADIUS}
-          fill={STATUS_COLORS[status]}
-          stroke="#000000"
-          strokeWidth={1}
-        />
+        <g data-testid="live-indicator" data-status={status}>
+          <circle
+            cx={indicatorPosition.x}
+            cy={indicatorPosition.y}
+            r={INDICATOR_RADIUS + 2}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={2}
+          />
+          <circle
+            cx={indicatorPosition.x}
+            cy={indicatorPosition.y}
+            r={INDICATOR_RADIUS}
+            fill={STATUS_COLORS[status]}
+            stroke="#000000"
+            strokeWidth={1.5}
+          />
+        </g>
       )}
     </svg>
   );
