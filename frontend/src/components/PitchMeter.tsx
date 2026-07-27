@@ -15,6 +15,8 @@ export interface PitchMeterProps {
   detectedNote: NoteInfo | null;
   /** The exercise's current target note, if one is playing. */
   targetMidiNumber: number | null;
+  /** Called with the pitch class index (0=C .. 11=B) when a bubble is clicked or activated via keyboard. */
+  onNoteClick?: (pitchClassIndex: number) => void;
 }
 
 const VIEWBOX_SIZE = 240;
@@ -29,7 +31,7 @@ const STATUS_COLORS = {
   off: '#e74c3c',
 } as const;
 
-export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) {
+export function PitchMeter({ detectedNote, targetMidiNumber, onNoteClick }: PitchMeterProps) {
   const targetPitchClass = targetMidiNumber !== null ? pitchClassIndex(targetMidiNumber) : null;
 
   // Cents relative to the exercise's target note (if any), otherwise relative to the
@@ -53,7 +55,25 @@ export function PitchMeter({ detectedNote, targetMidiNumber }: PitchMeterProps) 
         const isTarget = targetPitchClass === index;
         const color = CHROMATIC_NOTE_COLORS[index];
         return (
-          <g key={name} data-testid={`note-bubble-${name}`} data-active={isTarget ? 'true' : 'false'}>
+          <g
+            key={name}
+            data-testid={`note-bubble-${name}`}
+            data-active={isTarget ? 'true' : 'false'}
+            role={onNoteClick ? 'button' : undefined}
+            tabIndex={onNoteClick ? 0 : undefined}
+            style={onNoteClick ? { cursor: 'pointer' } : undefined}
+            onClick={onNoteClick ? () => onNoteClick(index) : undefined}
+            onKeyDown={
+              onNoteClick
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onNoteClick(index);
+                    }
+                  }
+                : undefined
+            }
+          >
             {isTarget && (
               <>
                 <circle cx={x} cy={y} r={BUBBLE_RADIUS + 6} fill="none" stroke="#ffffff" strokeWidth={2} />

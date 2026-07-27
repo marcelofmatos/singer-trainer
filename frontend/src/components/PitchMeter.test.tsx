@@ -1,6 +1,6 @@
 // frontend/src/components/PitchMeter.test.tsx
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { PitchMeter } from './PitchMeter';
 
 describe('PitchMeter', () => {
@@ -76,5 +76,24 @@ describe('PitchMeter', () => {
     );
     expect(screen.getByTestId('live-indicator').dataset.status).toBe('close');
     expect(screen.getByTestId('note-bubble-A').dataset.active).toBe('false');
+  });
+
+  it('calls onNoteClick with the pitch class index when a bubble is clicked', () => {
+    const handleClick = vi.fn();
+    render(<PitchMeter detectedNote={null} targetMidiNumber={null} onNoteClick={handleClick} />);
+    fireEvent.click(screen.getByTestId('note-bubble-D'));
+    expect(handleClick).toHaveBeenCalledWith(2);
+  });
+
+  it('calls onNoteClick when a bubble is activated via keyboard (Enter)', () => {
+    const handleClick = vi.fn();
+    render(<PitchMeter detectedNote={null} targetMidiNumber={null} onNoteClick={handleClick} />);
+    fireEvent.keyDown(screen.getByTestId('note-bubble-A'), { key: 'Enter' });
+    expect(handleClick).toHaveBeenCalledWith(9);
+  });
+
+  it('does not throw when a bubble is clicked without an onNoteClick handler', () => {
+    render(<PitchMeter detectedNote={null} targetMidiNumber={null} />);
+    expect(() => fireEvent.click(screen.getByTestId('note-bubble-C'))).not.toThrow();
   });
 });
