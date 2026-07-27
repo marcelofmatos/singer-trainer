@@ -4,7 +4,7 @@
 
 **Goal:** Build a standalone browser app that gives real-time visual feedback of singing pitch accuracy against a built-in vocal exercise — the core reason this whole project exists, with no backend/database/Docker required for this slice.
 
-**Architecture:** A Vite + React + TypeScript single-page app. All audio work happens client-side: a YIN pitch detector reads microphone input via the Web Audio `AnalyserNode`, exercises are defined as note sequences played back through an `OscillatorNode` for the reference tone, and a tuning-gauge component renders the live comparison between target note and detected note. No server, no recording/upload — those are later plans (backend API, Python analysis service, Docker stack, repertoire/progress screens), per `/home/marcelo/.claude/plans/preciso-criar-um-aplicativo-elegant-lynx.md`.
+**Architecture:** A Vite + React + TypeScript single-page app. All audio work happens client-side: a YIN pitch detector reads microphone input via the Web Audio `AnalyserNode`, exercises are defined as note sequences played back through an `OscillatorNode` for the reference tone, and a tuning-gauge component renders the live comparison between target note and detected note. No server, no recording/upload — those are later plans (backend API, Python analysis service, Docker stack, repertoire/progress screens), per the broader architecture roadmap agreed on before this slice was built.
 
 **Tech Stack:** Vite, React 18, TypeScript, Vitest (+ jsdom) for unit tests of pure logic.
 
@@ -1238,4 +1238,4 @@ git commit -m "feat: wire exercise picker and live practice screen"
 - Docker Compose stack and Traefik exposure.
 
 These follow in later plans once this live-feedback core is implemented and manually verified,
-per `/home/marcelo/.claude/plans/preciso-criar-um-aplicativo-elegant-lynx.md`.
+per the broader architecture roadmap agreed on before this slice was built.
