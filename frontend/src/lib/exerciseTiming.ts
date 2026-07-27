@@ -12,3 +12,19 @@ export function noteAtTime(exercise: Exercise, elapsedSeconds: number): Exercise
   );
   return match ?? null;
 }
+
+/**
+ * Returns a copy of the exercise with every note's startTime/duration scaled by a
+ * playback rate (2 = twice as fast/shorter notes, 0.5 = half speed/longer notes).
+ * Does not affect pitch — only timing.
+ */
+export function scaleExerciseTiming(exercise: Exercise, rate: number): Exercise {
+  return {
+    ...exercise,
+    notes: exercise.notes.map((note) => ({
+      ...note,
+      startTime: note.startTime / rate,
+      duration: note.duration / rate,
+    })),
+  };
+}
