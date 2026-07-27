@@ -46,6 +46,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
       audioContext = new AudioContext();
       oscillator = playExerciseTone(audioContext, scaledExercise);
       setToneError(null);
+      setElapsed(0);
 
       const startedAt = performance.now();
       elapsedTimer = setInterval(() => {
