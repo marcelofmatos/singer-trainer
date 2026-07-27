@@ -34,10 +34,25 @@ npm test
 
 ## Docker
 
+Build local (dev/teste, sem publicar):
+
 ```bash
-cd frontend
-./release-and-build.sh 0.1.0   # builda e versiona a imagem (SemVer + latest)
+docker build -t singer-trainer-frontend:dev frontend
 ```
+
+**Release**: publicar uma versão builda e publica a imagem automaticamente via GitHub
+Actions ([`.github/workflows/release-and-build.yml`](.github/workflows/release-and-build.yml)) —
+basta criar e empurrar uma tag `vX.Y.Z`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+O workflow roda os testes e, se passarem, publica
+`ghcr.io/marcelofmatos/singer-trainer-frontend:X.Y.Z` e atualiza a tag `latest` no mesmo
+build. Versões já publicadas nunca são sobrescritas — uma correção ou feature nova é
+sempre uma versão nova (SemVer).
 
 A stack de deploy (compose, variáveis de ambiente, proxy) fica fora deste repositório,
 num diretório de infraestrutura separado.
