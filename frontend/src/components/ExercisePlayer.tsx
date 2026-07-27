@@ -4,6 +4,7 @@ import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
 import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
 import { playExerciseTone } from '../audio/referenceTone';
+import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import { PitchMeter } from './PitchMeter';
 
@@ -14,6 +15,9 @@ export interface ExercisePlayerProps {
 const MIN_PLAYBACK_RATE = 0.5;
 const MAX_PLAYBACK_RATE = 2;
 const PLAYBACK_RATE_STEP = 0.25;
+// The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
+const PREVIEW_OCTAVE_BASE_MIDI = 60;
+const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 
 export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
@@ -78,6 +82,19 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
+  function handleNoteClick(pitchClass: number) {
+    try {
+      const previewContext = new AudioContext();
+      playPreviewTone(previewContext, PREVIEW_OCTAVE_BASE_MIDI + pitchClass);
+      setTimeout(() => previewContext.close(), PREVIEW_CONTEXT_LIFETIME_MS);
+      setToneError(null);
+    } catch (err) {
+      setToneError(
+        err instanceof Error ? err.message : 'Não foi possível reproduzir o áudio de referência.'
+      );
+    }
+  }
+
   return (
     <section className="exercise-panel">
       <h2 className="exercise-title">{exercise.name}</h2>
@@ -101,6 +118,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
         <PitchMeter
           detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
           targetMidiNumber={targetNote?.midiNumber ?? null}
+          onNoteClick={handleNoteClick}
         />
       </div>
 
