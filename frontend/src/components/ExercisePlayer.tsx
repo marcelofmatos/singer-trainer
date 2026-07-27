@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
+import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
 import { playExerciseTone } from '../audio/referenceTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import { PitchMeter } from './PitchMeter';
@@ -13,12 +14,11 @@ export interface ExercisePlayerProps {
 const MIN_PLAYBACK_RATE = 0.5;
 const MAX_PLAYBACK_RATE = 2;
 const PLAYBACK_RATE_STEP = 0.25;
-const DEFAULT_PLAYBACK_RATE = 1;
 
 export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState(DEFAULT_PLAYBACK_RATE);
-  const [loop, setLoop] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
+  const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
   const pitchTracker = usePitchTracker();
@@ -30,6 +30,10 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   useEffect(() => {
     loopRef.current = loop;
   }, [loop]);
+
+  useEffect(() => {
+    savePlaybackPreferences({ playbackRate, loop });
+  }, [playbackRate, loop]);
 
   const scaledExercise = useMemo(
     () => scaleExerciseTiming(exercise, playbackRate),
