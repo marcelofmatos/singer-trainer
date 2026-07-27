@@ -133,6 +133,11 @@ body {
   z-index: 1;
 }
 
+.wheel-stage g[role='button']:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .exercise-controls {
   display: flex;
   align-items: center;
