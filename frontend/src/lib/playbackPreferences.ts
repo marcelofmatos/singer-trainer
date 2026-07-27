@@ -17,8 +17,14 @@ export function loadPlaybackPreferences(): PlaybackPreferences {
     if (!raw) return DEFAULT_PLAYBACK_PREFERENCES;
 
     const parsed = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      return DEFAULT_PLAYBACK_PREFERENCES;
+    }
+
     const playbackRate =
-      typeof parsed.playbackRate === 'number'
+      typeof parsed.playbackRate === 'number' &&
+      Number.isFinite(parsed.playbackRate) &&
+      parsed.playbackRate > 0
         ? parsed.playbackRate
         : DEFAULT_PLAYBACK_PREFERENCES.playbackRate;
     const loop = typeof parsed.loop === 'boolean' ? parsed.loop : DEFAULT_PLAYBACK_PREFERENCES.loop;

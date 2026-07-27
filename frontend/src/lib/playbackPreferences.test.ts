@@ -35,4 +35,26 @@ describe('playbackPreferences', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ playbackRate: 1.75, loop: 'yes' }));
     expect(loadPlaybackPreferences()).toEqual({ playbackRate: 1.75, loop: false });
   });
+
+  it('falls back to defaults when the stored JSON is not an object', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(null));
+    expect(loadPlaybackPreferences()).toEqual(DEFAULT_PLAYBACK_PREFERENCES);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([1, 2, 3]));
+    expect(loadPlaybackPreferences()).toEqual(DEFAULT_PLAYBACK_PREFERENCES);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(5));
+    expect(loadPlaybackPreferences()).toEqual(DEFAULT_PLAYBACK_PREFERENCES);
+  });
+
+  it('falls back to the default rate when the stored rate is non-finite or non-positive', () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ playbackRate: 1e999, loop: false }));
+    expect(loadPlaybackPreferences().playbackRate).toBe(DEFAULT_PLAYBACK_PREFERENCES.playbackRate);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ playbackRate: -1, loop: false }));
+    expect(loadPlaybackPreferences().playbackRate).toBe(DEFAULT_PLAYBACK_PREFERENCES.playbackRate);
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ playbackRate: 0, loop: false }));
+    expect(loadPlaybackPreferences().playbackRate).toBe(DEFAULT_PLAYBACK_PREFERENCES.playbackRate);
+  });
 });
