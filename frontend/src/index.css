@@ -1,16 +1,182 @@
 :root {
-  color-scheme: light dark;
-  font-family: system-ui, sans-serif;
+  color-scheme: dark;
+  --color-bg: #14110f;
+  --color-bg-elevated: #1e1a17;
+  --color-text: #f2ece4;
+  --color-text-muted: #a89e93;
+  --color-accent: #e8a33d;
+  --color-accent-soft: rgba(232, 163, 61, 0.18);
+  --color-border: #2c2521;
+  --color-danger: #e8734d;
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-body: 'Manrope Variable', system-ui, sans-serif;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #ffffff;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
 }
 
 #root {
-  max-width: 720px;
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 880px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 3rem 1.5rem 4rem;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.app-title {
+  font-family: var(--font-display);
+  font-size: 2.75rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+}
+
+.app-subtitle {
+  color: var(--color-text-muted);
+  margin: 0;
+  font-size: 1rem;
+}
+
+.exercise-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.exercise-tab {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.6rem 1.25rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.exercise-tab:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.exercise-tab[aria-selected='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #1a1508;
+}
+
+.exercise-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.exercise-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.exercise-description {
+  color: var(--color-text-muted);
+  max-width: 480px;
+  margin: 0 0 2rem;
+  line-height: 1.5;
+}
+
+.status-message {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  margin: 0 0 1rem;
+}
+
+.status-message[role='alert'] {
+  color: var(--color-danger);
+}
+
+.wheel-stage {
+  position: relative;
+  width: min(100%, 360px);
+  margin-bottom: 2rem;
+}
+
+.wheel-stage::before {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(circle, var(--color-accent-soft) 0%, transparent 70%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.wheel-stage > svg {
+  position: relative;
+  z-index: 1;
+}
+
+.exercise-controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+  width: 100%;
+  max-width: 420px;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.speed-control input[type='range'] {
+  accent-color: var(--color-accent);
+  width: 120px;
+}
+
+.speed-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  min-width: 3ch;
+}
+
+.loop-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.loop-toggle input {
+  accent-color: var(--color-accent);
+  width: 1.1rem;
+  height: 1.1rem;
+  cursor: pointer;
 }
