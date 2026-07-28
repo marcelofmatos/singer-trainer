@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectPitchYIN } from './pitchDetection';
+import { DEFAULT_THRESHOLD, detectPitchYIN } from './pitchDetection';
 
 const SAMPLE_RATE = 44100;
 const BUFFER_SIZE = 4096;
@@ -38,5 +38,11 @@ describe('detectPitchYIN', () => {
     const buffer = new Float32Array(BUFFER_SIZE);
     const result = detectPitchYIN(buffer, SAMPLE_RATE);
     expect(result).toBeNull();
+  });
+});
+
+describe('DEFAULT_THRESHOLD', () => {
+  it('is exported for other modules to reference as the baseline sensitivity', () => {
+    expect(DEFAULT_THRESHOLD).toBe(0.15);
   });
 });

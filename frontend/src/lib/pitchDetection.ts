@@ -3,7 +3,7 @@ export interface PitchResult {
   probability: number;
 }
 
-const DEFAULT_THRESHOLD = 0.15;
+export const DEFAULT_THRESHOLD = 0.15;
 
 /**
  * YIN pitch detection (de Cheveigné & Kawahara, 2002).
