@@ -49,9 +49,9 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
     const audioContext = audioContextRef.current;
     if (!audioContext) return;
     if (playing) {
-      audioContext.resume().catch(() => {});
+      audioContext.resume().catch((err) => console.error('Failed to change audio playback state:', err));
     } else {
-      audioContext.suspend().catch(() => {});
+      audioContext.suspend().catch((err) => console.error('Failed to change audio playback state:', err));
     }
   }, [playing]);
 
@@ -82,7 +82,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
       audioContext = new AudioContext();
       audioContextRef.current = audioContext;
       if (!playingRef.current) {
-        audioContext.suspend().catch(() => {});
+        audioContext.suspend().catch((err) => console.error('Failed to change audio playback state:', err));
       }
 
       const { gain } = playExerciseTone(audioContext, scaledExercise);
@@ -101,6 +101,8 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
           hasEnded = true;
           if (loopRef.current) {
             setCycle((c) => c + 1);
+          } else if (pollTimer) {
+            clearInterval(pollTimer);
           }
         }
       }, 100);
