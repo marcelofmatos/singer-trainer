@@ -1,0 +1,55 @@
+# -----------------------------------------------------------------------------
+# Toggle de GitHub Environments
+# -----------------------------------------------------------------------------
+# O job abaixo usa a variável de repositório `USE_ENVIRONMENTS` para decidir
+# se vincula o deploy a um GitHub Environment (`production`).
+#
+# Configuração em Settings → Secrets and variables → Actions:
+#
+#   Variables → New repository variable
+#     • USE_ENVIRONMENTS = "false"  → bypass: nenhum environment é exigido.
+#                                     Secrets lidos do nível repositório.
+#     • USE_ENVIRONMENTS = "true"   → modo normal: exige que o environment
+#                                     `production` exista.
+#                                     Secrets do environment têm precedência.
+#
+#   Secrets necessários (em repository secrets enquanto bypass; podem ser
+#   movidos para environment secrets depois):
+#     • PORTAINER_DEPLOY_PRD_WEBHOOK_URL
+#
+# Quando o environment for criado no GitHub, basta alterar USE_ENVIRONMENTS
+# para "true" — não é necessário editar este arquivo.
+#
+# O deploy de homologação (HMG) também é manual — ver workflow "🚢 Deploy (HMG)"
+# (.github/workflows/deploy-hmg.yml).
+# -----------------------------------------------------------------------------
+
+name: 🚢 Deploy (PRD)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prd
+  cancel-in-progress: false
+
+jobs:
+  deploy-prd:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ vars.USE_ENVIRONMENTS == 'true' && 'production' || '' }}
+    permissions: {}
+    steps:
+      - name: 🚀 Trigger Portainer webhook (PRD)
+        env:
+          WEBHOOK_URL: ${{ secrets.PORTAINER_DEPLOY_PRD_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::PORTAINER_DEPLOY_PRD_WEBHOOK_URL secret is not set for environment 'production'."
+            exit 1
+          fi
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"ref":"main"}' \
+            --fail --silent --show-error
+          echo "Production deploy triggered."

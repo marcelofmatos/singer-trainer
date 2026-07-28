@@ -1,0 +1,52 @@
+# -----------------------------------------------------------------------------
+# Toggle de GitHub Environments
+# -----------------------------------------------------------------------------
+# Este job usa a variável de repositório `USE_ENVIRONMENTS` para decidir
+# se vincula o deploy a um GitHub Environment (`homologation`).
+#
+# Configuração em Settings → Secrets and variables → Actions:
+#
+#   Variables → New repository variable
+#     • USE_ENVIRONMENTS = "false"  → bypass: nenhum environment é exigido.
+#                                     Secrets lidos do nível repositório.
+#     • USE_ENVIRONMENTS = "true"   → modo normal: exige que o environment
+#                                     `homologation` exista.
+#                                     Secrets do environment têm precedência.
+#
+#   Secrets necessários (em repository secrets enquanto bypass; podem ser
+#   movidos para environment secrets depois):
+#     • PORTAINER_DEPLOY_HMG_WEBHOOK_URL
+#
+# Quando o environment for criado no GitHub, basta alterar USE_ENVIRONMENTS
+# para "true" — não é necessário editar este arquivo.
+# -----------------------------------------------------------------------------
+
+name: 🚢 Deploy (HMG)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-hmg
+  cancel-in-progress: false
+
+jobs:
+  deploy-hmg:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ vars.USE_ENVIRONMENTS == 'true' && 'homologation' || '' }}
+    permissions: {}
+    steps:
+      - name: 🚀 Trigger Portainer webhook (HMG)
+        env:
+          WEBHOOK_URL: ${{ secrets.PORTAINER_DEPLOY_HMG_WEBHOOK_URL }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "::error::PORTAINER_DEPLOY_HMG_WEBHOOK_URL secret is not set for environment 'homologation'."
+            exit 1
+          fi
+          curl -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{"ref":"main"}' \
+            --fail --silent --show-error
+          echo "Homologation deploy triggered."
