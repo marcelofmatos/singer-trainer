@@ -45,17 +45,19 @@ Build local (dev/teste, sem publicar):
 docker build -t singer-trainer:dev frontend
 ```
 
-**Release**: publicar uma versão builda e publica a imagem automaticamente via GitHub
-Actions ([`.github/workflows/release-and-build.yml`](.github/workflows/release-and-build.yml)) —
-basta criar e empurrar uma tag `vX.Y.Z`:
+**Release**: as imagens são versionadas em SemVer (`x.y.z`) mais `latest`, publicadas no
+GHCR pelo workflow **Release and build** do GitHub Actions
+([`.github/workflows/release-and-build.yml`](.github/workflows/release-and-build.yml)) —
+Actions → *Release and build* → Run workflow → `patch` / `minor` / `major`. Cada execução
+cria a tag, o release no GitHub e publica:
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
+```
+ghcr.io/marcelofmatos/singer-trainer:<x.y.z>
+ghcr.io/marcelofmatos/singer-trainer:<x.y>
+ghcr.io/marcelofmatos/singer-trainer:<x>
+ghcr.io/marcelofmatos/singer-trainer:latest
 ```
 
-O workflow roda os testes e, se passarem, publica
-`ghcr.io/marcelofmatos/singer-trainer:X.Y.Z` e atualiza a tag `latest` no mesmo build.
 Versões já publicadas nunca são sobrescritas — uma correção ou feature nova é sempre uma
 versão nova (SemVer).
 
