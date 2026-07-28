@@ -62,4 +62,35 @@ export const BUILTIN_EXERCISES: Exercise[] = [
     description: 'Sustente uma nota confortável o máximo que puder com respiração controlada.',
     notes: [{ midiNumber: MIDDLE_C, startTime: 0, duration: 8 }],
   },
+  {
+    id: 'arpejo-maior-c4',
+    name: 'Arpejo Maior',
+    category: 'escala',
+    description:
+      'Dó-Mi-Sol-Dó e volta — um clássico de aquecimento vocal para agilidade e para conectar ' +
+      'registros com mais leveza que uma escala completa.',
+    notes: buildScale(MIDDLE_C, [0, 4, 7, 12], 0.5),
+  },
+  {
+    id: 'escala-cinco-notas',
+    name: 'Escala de 5 Notas',
+    category: 'aquecimento',
+    description:
+      'Dó-Ré-Mi-Fá-Sol e volta — mais curta e suave que a escala completa, ótima para abrir a sessão.',
+    notes: buildScale(MIDDLE_C, [0, 2, 4, 5, 7], 0.5),
+  },
+  {
+    id: 'saltos-oitava',
+    name: 'Saltos de Oitava',
+    category: 'escala',
+    description:
+      'Alterna diretamente entre Dó4 e Dó5, sem escala intermediária — treina a passagem de registro.',
+    notes: [
+      { midiNumber: MIDDLE_C, startTime: 0, duration: 1 },
+      { midiNumber: MIDDLE_C + 12, startTime: 1, duration: 1 },
+      { midiNumber: MIDDLE_C, startTime: 2, duration: 1 },
+      { midiNumber: MIDDLE_C + 12, startTime: 3, duration: 1 },
+      { midiNumber: MIDDLE_C, startTime: 4, duration: 1 },
+    ],
+  },
 ];

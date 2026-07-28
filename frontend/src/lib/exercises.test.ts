@@ -39,4 +39,11 @@ describe('BUILTIN_EXERCISES', () => {
       }
     });
   });
+
+  it('includes the arpeggio, 5-tone scale, and octave-jump warmup exercises', () => {
+    const ids = BUILTIN_EXERCISES.map((e) => e.id);
+    expect(ids).toContain('arpejo-maior-c4');
+    expect(ids).toContain('escala-cinco-notas');
+    expect(ids).toContain('saltos-oitava');
+  });
 });
