@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
 import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
-import { playExerciseTone } from '../audio/referenceTone';
+import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import { PitchMeter } from './PitchMeter';
@@ -15,6 +15,9 @@ export interface ExercisePlayerProps {
 const MIN_PLAYBACK_RATE = 0.5;
 const MAX_PLAYBACK_RATE = 2;
 const PLAYBACK_RATE_STEP = 0.25;
+const MIN_SENSITIVITY = 0.05;
+const MAX_SENSITIVITY = 0.35;
+const SENSITIVITY_STEP = 0.05;
 // The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
@@ -23,18 +26,43 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
-  const [micSensitivity] = useState(() => loadPlaybackPreferences().micSensitivity);
+  const [micSensitivity, setMicSensitivity] = useState(
+    () => loadPlaybackPreferences().micSensitivity
+  );
+  const [playing, setPlaying] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
-  const pitchTracker = usePitchTracker();
+  const pitchTracker = usePitchTracker(micSensitivity);
 
-  // Read via a ref inside the effect below so toggling "loop" mid-playback doesn't
-  // restart the currently-playing cycle — it only decides what happens once the
-  // *current* cycle naturally ends.
+  // Read via refs inside the effect below so toggling these controls mid-playback
+  // doesn't restart the currently-playing cycle from scratch.
   const loopRef = useRef(loop);
   useEffect(() => {
     loopRef.current = loop;
   }, [loop]);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const playingRef = useRef(playing);
+  useEffect(() => {
+    playingRef.current = playing;
+    const audioContext = audioContextRef.current;
+    if (!audioContext) return;
+    if (playing) {
+      audioContext.resume().catch(() => {});
+    } else {
+      audioContext.suspend().catch(() => {});
+    }
+  }, [playing]);
+
+  const gainRef = useRef<GainNode | null>(null);
+  const mutedRef = useRef(muted);
+  useEffect(() => {
+    mutedRef.current = muted;
+    const gain = gainRef.current;
+    if (!gain) return;
+    gain.gain.value = muted ? 0 : REFERENCE_TONE_GAIN;
+  }, [muted]);
 
   useEffect(() => {
     savePlaybackPreferences({ playbackRate, loop, micSensitivity });
@@ -47,26 +75,35 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
 
   useEffect(() => {
     let audioContext: AudioContext | null = null;
-    let oscillator: OscillatorNode | null = null;
-    let elapsedTimer: ReturnType<typeof setInterval> | null = null;
-    let loopTimeout: ReturnType<typeof setTimeout> | null = null;
+    let pollTimer: ReturnType<typeof setInterval> | null = null;
+    let hasEnded = false;
 
     try {
       audioContext = new AudioContext();
-      oscillator = playExerciseTone(audioContext, scaledExercise);
+      audioContextRef.current = audioContext;
+      if (!playingRef.current) {
+        audioContext.suspend().catch(() => {});
+      }
+
+      const { gain } = playExerciseTone(audioContext, scaledExercise);
+      gainRef.current = gain;
+      if (mutedRef.current) {
+        gain.gain.value = 0;
+      }
       setToneError(null);
       setElapsed(0);
 
-      const startedAt = performance.now();
-      elapsedTimer = setInterval(() => {
-        setElapsed((performance.now() - startedAt) / 1000);
-      }, 100);
-
-      loopTimeout = setTimeout(() => {
-        if (loopRef.current) {
-          setCycle((c) => c + 1);
+      pollTimer = setInterval(() => {
+        if (!audioContext) return;
+        const currentTime = audioContext.currentTime;
+        setElapsed(currentTime);
+        if (!hasEnded && currentTime >= exerciseDuration(scaledExercise)) {
+          hasEnded = true;
+          if (loopRef.current) {
+            setCycle((c) => c + 1);
+          }
         }
-      }, exerciseDuration(scaledExercise) * 1000);
+      }, 100);
     } catch (err) {
       setToneError(
         err instanceof Error ? err.message : 'Não foi possível reproduzir o áudio de referência.'
@@ -74,16 +111,17 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
     }
 
     return () => {
-      if (elapsedTimer) clearInterval(elapsedTimer);
-      if (loopTimeout) clearTimeout(loopTimeout);
-      oscillator?.stop();
+      if (pollTimer) clearInterval(pollTimer);
       audioContext?.close();
+      audioContextRef.current = null;
+      gainRef.current = null;
     };
   }, [scaledExercise, cycle]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
   function handleNoteClick(pitchClass: number) {
+    if (muted) return;
     try {
       const previewContext = new AudioContext();
       playPreviewTone(previewContext, PREVIEW_OCTAVE_BASE_MIDI + pitchClass);
@@ -124,6 +162,26 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
       </div>
 
       <div className="exercise-controls">
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setPlaying((p) => !p)}
+          aria-pressed={!playing}
+          aria-label={playing ? 'Pausar' : 'Retomar'}
+        >
+          {playing ? '⏸' : '▶'}
+        </button>
+
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setMuted((m) => !m)}
+          aria-pressed={muted}
+          aria-label={muted ? 'Ativar som' : 'Silenciar'}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+
         <label className="speed-control">
           Velocidade
           <input
@@ -144,6 +202,19 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
             onChange={(event) => setLoop(event.target.checked)}
           />
           Repetir
+        </label>
+
+        <label className="speed-control">
+          Sensibilidade do microfone
+          <input
+            type="range"
+            min={MIN_SENSITIVITY}
+            max={MAX_SENSITIVITY}
+            step={SENSITIVITY_STEP}
+            value={micSensitivity}
+            onChange={(event) => setMicSensitivity(Number(event.target.value))}
+          />
+          <span className="speed-value">{micSensitivity.toFixed(2)}</span>
         </label>
       </div>
     </section>
