@@ -23,6 +23,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
+  const [micSensitivity] = useState(() => loadPlaybackPreferences().micSensitivity);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
   const pitchTracker = usePitchTracker();
@@ -36,8 +37,8 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   }, [loop]);
 
   useEffect(() => {
-    savePlaybackPreferences({ playbackRate, loop });
-  }, [playbackRate, loop]);
+    savePlaybackPreferences({ playbackRate, loop, micSensitivity });
+  }, [playbackRate, loop, micSensitivity]);
 
   const scaledExercise = useMemo(
     () => scaleExerciseTiming(exercise, playbackRate),
