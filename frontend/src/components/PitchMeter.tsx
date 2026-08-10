@@ -15,6 +15,8 @@ export interface PitchMeterProps {
   detectedNote: NoteInfo | null;
   /** The exercise's current target note, if one is playing. */
   targetMidiNumber: number | null;
+  /** True when the microphone stream failed or permission was denied. */
+  micDisconnected: boolean;
   /** Called with the pitch class index (0=C .. 11=B) when a bubble is clicked or activated via keyboard. */
   onNoteClick?: (pitchClassIndex: number) => void;
 }
@@ -31,7 +33,12 @@ const STATUS_COLORS = {
   off: '#e74c3c',
 } as const;
 
-export function PitchMeter({ detectedNote, targetMidiNumber, onNoteClick }: PitchMeterProps) {
+export function PitchMeter({
+  detectedNote,
+  targetMidiNumber,
+  micDisconnected,
+  onNoteClick,
+}: PitchMeterProps) {
   const targetPitchClass = targetMidiNumber !== null ? pitchClassIndex(targetMidiNumber) : null;
 
   // Cents relative to the exercise's target note (if any), otherwise relative to the
@@ -119,6 +126,38 @@ export function PitchMeter({ detectedNote, targetMidiNumber, onNoteClick }: Pitc
             fill={STATUS_COLORS[status]}
           />
         </g>
+      )}
+      {micDisconnected ? (
+        <text
+          data-testid="mic-disconnected-icon"
+          x={CENTER.x}
+          y={CENTER.y}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize="32"
+          aria-hidden="true"
+        >
+          🎤🚫
+        </text>
+      ) : (
+        detectedNote &&
+        status && (
+          <text
+            data-testid="center-note-label"
+            x={CENTER.x}
+            y={CENTER.y}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="var(--font-display)"
+            fontSize="28"
+            fontWeight={600}
+            fill={STATUS_COLORS[status]}
+            aria-hidden="true"
+          >
+            {detectedNote.noteName}
+            {detectedNote.octave}
+          </text>
+        )
       )}
     </svg>
   );
