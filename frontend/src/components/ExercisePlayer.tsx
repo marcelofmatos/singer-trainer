@@ -159,6 +159,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
         <PitchMeter
           detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
           targetMidiNumber={targetNote?.midiNumber ?? null}
+          micDisconnected={pitchTracker.status === 'error'}
           onNoteClick={handleNoteClick}
         />
       </div>
