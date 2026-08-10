@@ -354,7 +354,7 @@ export function PitchMeter({
 - [ ] **Step 4: Run tests to verify they all pass**
 
 Run: `cd frontend && npm test`
-Expected: PASS — all 15 tests in `PitchMeter.test.tsx` (12 pre-existing + 3 new).
+Expected: PASS — all 14 tests in `PitchMeter.test.tsx` (11 pre-existing + 3 new).
 
 - [ ] **Step 5: Type-check**
 
