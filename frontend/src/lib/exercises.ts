@@ -24,7 +24,32 @@ export function buildScale(rootMidi: number, intervals: number[], noteDuration =
   }));
 }
 
+/**
+ * Builds a descending note sequence where each scale degree is repeated `repeats` times
+ * before stepping down to the next one — e.g. Dó5-Dó5-Dó5, Si4-Si4-Si4, Lá4-Lá4-Lá4, ...
+ */
+export function buildDescendingRepeatedScale(
+  rootMidi: number,
+  intervals: number[],
+  repeats: number,
+  noteDuration = 0.4
+): ExerciseNote[] {
+  const descending = [...intervals].reverse();
+  const notes: ExerciseNote[] = [];
+  descending.forEach((interval) => {
+    for (let i = 0; i < repeats; i++) {
+      notes.push({
+        midiNumber: rootMidi + interval,
+        startTime: notes.length * noteDuration,
+        duration: noteDuration,
+      });
+    }
+  });
+  return notes;
+}
+
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11, 12];
+const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10, 12]; // Dó-Ré-Mib-Fá-Sol-Láb-Sib-Dó
 const MIDDLE_C = 60;
 
 export const BUILTIN_EXERCISES: Exercise[] = [
@@ -92,5 +117,21 @@ export const BUILTIN_EXERCISES: Exercise[] = [
       { midiNumber: MIDDLE_C + 12, startTime: 3, duration: 1 },
       { midiNumber: MIDDLE_C, startTime: 4, duration: 1 },
     ],
+  },
+  {
+    id: 'escala-menor-c4',
+    name: 'Escala Menor (Dó central)',
+    category: 'escala',
+    description: 'Escala menor natural de Dó4 a Dó5 e volta, mesmo formato da escala maior.',
+    notes: buildScale(MIDDLE_C, MINOR_SCALE_INTERVALS, 0.6),
+  },
+  {
+    id: 'escala-menor-degraus',
+    name: 'Escala Menor em Degraus',
+    category: 'escala',
+    description:
+      'Dó5 até Dó4, cada nota repetida 3 vezes antes de descer um degrau — treina a ' +
+      'precisão de afinação nota a nota, descendo pela escala menor.',
+    notes: buildDescendingRepeatedScale(MIDDLE_C, MINOR_SCALE_INTERVALS, 3, 0.4),
   },
 ];

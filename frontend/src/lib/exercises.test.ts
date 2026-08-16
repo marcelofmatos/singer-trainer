@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_EXERCISES, buildScale } from './exercises';
+import { BUILTIN_EXERCISES, buildDescendingRepeatedScale, buildScale } from './exercises';
 
 describe('buildScale', () => {
   it('builds an up-and-down sequence from root + intervals', () => {
@@ -12,6 +12,25 @@ describe('buildScale', () => {
     const notes = buildScale(60, [0, 2, 4], 0.5);
     expect(notes.map((n) => n.startTime)).toEqual([0, 0.5, 1, 1.5, 2]);
     notes.forEach((note) => expect(note.duration).toBe(0.5));
+  });
+});
+
+describe('buildDescendingRepeatedScale', () => {
+  it('repeats each interval, descending, before stepping to the next', () => {
+    const notes = buildDescendingRepeatedScale(60, [0, 2, 4], 2, 1);
+    // descending: 4, 4, 2, 2, 0, 0 (each interval repeated twice)
+    expect(notes.map((n) => n.midiNumber)).toEqual([64, 64, 62, 62, 60, 60]);
+  });
+
+  it('assigns sequential, non-overlapping start times', () => {
+    const notes = buildDescendingRepeatedScale(60, [0, 2, 4], 2, 0.5);
+    expect(notes.map((n) => n.startTime)).toEqual([0, 0.5, 1, 1.5, 2, 2.5]);
+    notes.forEach((note) => expect(note.duration).toBe(0.5));
+  });
+
+  it('produces intervals.length * repeats notes', () => {
+    const notes = buildDescendingRepeatedScale(60, [0, 2, 3, 5, 7, 8, 10, 12], 3, 0.4);
+    expect(notes.length).toBe(24);
   });
 });
 
@@ -45,5 +64,11 @@ describe('BUILTIN_EXERCISES', () => {
     expect(ids).toContain('arpejo-maior-c4');
     expect(ids).toContain('escala-cinco-notas');
     expect(ids).toContain('saltos-oitava');
+  });
+
+  it('includes the minor scale and stepped-descent minor scale exercises', () => {
+    const ids = BUILTIN_EXERCISES.map((e) => e.id);
+    expect(ids).toContain('escala-menor-c4');
+    expect(ids).toContain('escala-menor-degraus');
   });
 });
