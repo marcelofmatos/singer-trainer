@@ -1,31 +1,34 @@
 // frontend/src/App.test.tsx
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import App from './App';
 import { BUILTIN_EXERCISES } from './lib/exercises';
 
 describe('App', () => {
-  it('lists every built-in exercise as a tab', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('lists every built-in exercise as an option in the dropdown', () => {
     render(<App />);
+    const select = screen.getByLabelText('Exercício');
+    expect(select.tagName).toBe('SELECT');
     BUILTIN_EXERCISES.forEach((exercise) => {
-      expect(screen.getByRole('tab', { name: exercise.name })).toBeDefined();
+      expect(screen.getByRole('option', { name: exercise.name })).toBeDefined();
     });
   });
 
   it('shows the first exercise selected and displayed by default', () => {
     render(<App />);
-    const firstTab = screen.getByRole('tab', { name: BUILTIN_EXERCISES[0].name });
-    expect(firstTab.getAttribute('aria-selected')).toBe('true');
+    const select = screen.getByLabelText('Exercício') as HTMLSelectElement;
+    expect(select.value).toBe(BUILTIN_EXERCISES[0].id);
     expect(screen.getByRole('heading', { name: BUILTIN_EXERCISES[0].name })).toBeDefined();
   });
 
-  it('switches the displayed exercise when a different tab is clicked', () => {
+  it('switches the displayed exercise when a different option is selected', () => {
     render(<App />);
     const secondExercise = BUILTIN_EXERCISES[1];
-    fireEvent.click(screen.getByRole('tab', { name: secondExercise.name }));
-    expect(
-      screen.getByRole('tab', { name: secondExercise.name }).getAttribute('aria-selected')
-    ).toBe('true');
+    fireEvent.change(screen.getByLabelText('Exercício'), { target: { value: secondExercise.id } });
     expect(screen.getByRole('heading', { name: secondExercise.name })).toBeDefined();
   });
 
@@ -34,5 +37,17 @@ describe('App', () => {
     ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].forEach((name) => {
       expect(screen.getByTestId(`note-bubble-${name}`)).toBeDefined();
     });
+  });
+
+  it('persists the selected exercise to localStorage and restores it on remount', () => {
+    const first = render(<App />);
+    const thirdExercise = BUILTIN_EXERCISES[2];
+    fireEvent.change(screen.getByLabelText('Exercício'), { target: { value: thirdExercise.id } });
+    expect(localStorage.getItem('singer-trainer:last-exercise-id')).toBe(thirdExercise.id);
+
+    first.unmount();
+    render(<App />);
+    const restoredSelect = screen.getByLabelText('Exercício') as HTMLSelectElement;
+    expect(restoredSelect.value).toBe(thirdExercise.id);
   });
 });

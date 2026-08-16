@@ -1,12 +1,19 @@
 // frontend/src/App.tsx
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BUILTIN_EXERCISES } from './lib/exercises';
+import { loadLastExerciseId, saveLastExerciseId } from './lib/lastExercise';
 import { ExercisePlayer } from './components/ExercisePlayer';
 
 export default function App() {
-  const [activeExerciseId, setActiveExerciseId] = useState(BUILTIN_EXERCISES[0].id);
+  const [activeExerciseId, setActiveExerciseId] = useState(
+    () => loadLastExerciseId() ?? BUILTIN_EXERCISES[0].id
+  );
   const activeExercise =
     BUILTIN_EXERCISES.find((exercise) => exercise.id === activeExerciseId) ?? BUILTIN_EXERCISES[0];
+
+  useEffect(() => {
+    saveLastExerciseId(activeExerciseId);
+  }, [activeExerciseId]);
 
   return (
     <main className="app">
@@ -15,20 +22,18 @@ export default function App() {
         <p className="app-subtitle">Feedback de afinação em tempo real, ao vivo.</p>
       </header>
 
-      <nav className="exercise-tabs" role="tablist" aria-label="Exercícios">
+      <select
+        className="exercise-select"
+        aria-label="Exercício"
+        value={activeExerciseId}
+        onChange={(event) => setActiveExerciseId(event.target.value)}
+      >
         {BUILTIN_EXERCISES.map((exercise) => (
-          <button
-            key={exercise.id}
-            type="button"
-            role="tab"
-            aria-selected={exercise.id === activeExerciseId}
-            className="exercise-tab"
-            onClick={() => setActiveExerciseId(exercise.id)}
-          >
+          <option key={exercise.id} value={exercise.id}>
             {exercise.name}
-          </button>
+          </option>
         ))}
-      </nav>
+      </select>
 
       <ExercisePlayer exercise={activeExercise} />
     </main>
