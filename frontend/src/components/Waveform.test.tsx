@@ -17,6 +17,19 @@ describe('Waveform', () => {
     expect(points.length).toBe(5);
   });
 
+  it('maps sample amplitude to y-coordinates with positive values up, negative down', () => {
+    render(
+      <Waveform
+        samples={[1, -1, 0]}
+        detectedNote={null}
+        targetMidiNumber={null}
+        micDisconnected={false}
+      />
+    );
+    // HEIGHT=80: value=1 -> y=0 (top), value=-1 -> y=80 (bottom), value=0 -> y=40 (middle)
+    expect(screen.getByTestId('waveform-trace').getAttribute('points')).toBe('0,0.00 1,80.00 2,40.00');
+  });
+
   it('renders no trace when there are no samples yet', () => {
     render(
       <Waveform samples={[]} detectedNote={null} targetMidiNumber={null} micDisconnected={false} />
