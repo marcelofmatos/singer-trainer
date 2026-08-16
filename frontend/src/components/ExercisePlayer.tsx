@@ -31,6 +31,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
     () => loadPlaybackPreferences().micSensitivity
   );
   const [playing, setPlaying] = useState(true);
+  const [ended, setEnded] = useState(false);
   const [muted, setMuted] = useState(false);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
       }
       setToneError(null);
       setElapsed(0);
+      setEnded(false);
 
       pollTimer = setInterval(() => {
         if (!audioContext) return;
@@ -102,8 +104,10 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
           hasEnded = true;
           if (loopRef.current) {
             setCycle((c) => c + 1);
-          } else if (pollTimer) {
-            clearInterval(pollTimer);
+          } else {
+            if (pollTimer) clearInterval(pollTimer);
+            setEnded(true);
+            setPlaying(false);
           }
         }
       }, 100);
@@ -122,6 +126,15 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   }, [scaledExercise, cycle]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
+
+  function togglePlaying() {
+    if (ended) {
+      setCycle((c) => c + 1);
+      setPlaying(true);
+    } else {
+      setPlaying((p) => !p);
+    }
+  }
 
   function handleNoteClick(pitchClass: number) {
     if (muted) return;
@@ -178,9 +191,9 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
         <button
           type="button"
           className="icon-button"
-          onClick={() => setPlaying((p) => !p)}
+          onClick={togglePlaying}
           aria-pressed={!playing}
-          aria-label={playing ? 'Pausar' : 'Retomar'}
+          aria-label={ended ? 'Reiniciar' : playing ? 'Pausar' : 'Retomar'}
         >
           {playing ? '⏸' : '▶'}
         </button>
