@@ -129,6 +129,20 @@ body {
   outline-offset: 2px;
 }
 
+.waveform-stage {
+  width: min(100%, 360px);
+  height: 90px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 2rem;
+  overflow: hidden;
+}
+
+.waveform-stage > svg {
+  display: block;
+}
+
 .exercise-controls {
   display: flex;
   align-items: center;

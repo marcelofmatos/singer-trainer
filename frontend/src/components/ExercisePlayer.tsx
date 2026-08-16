@@ -7,6 +7,7 @@ import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import { PitchMeter } from './PitchMeter';
+import { Waveform } from './Waveform';
 
 export interface ExercisePlayerProps {
   exercise: Exercise;
@@ -161,6 +162,15 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
           targetMidiNumber={targetNote?.midiNumber ?? null}
           micDisconnected={pitchTracker.status === 'error'}
           onNoteClick={handleNoteClick}
+        />
+      </div>
+
+      <div className="waveform-stage">
+        <Waveform
+          samples={pitchTracker.waveform}
+          detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
+          targetMidiNumber={targetNote?.midiNumber ?? null}
+          micDisconnected={pitchTracker.status === 'error'}
         />
       </div>
 
