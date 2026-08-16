@@ -1,4 +1,5 @@
 // frontend/src/components/PitchMeter.tsx
+import { useEffect, useRef, useState } from 'react';
 import {
   CHROMATIC_NOTE_COLORS,
   CHROMATIC_NOTE_NAMES,
@@ -8,7 +9,8 @@ import {
   pointOnCircle,
   readableTextColor,
 } from '../lib/chromaticWheel';
-import { STATUS_COLORS, statusForNote } from '../lib/tuningGauge';
+import { advanceTrail } from '../lib/indicatorTrail';
+import { STATUS_COLORS, statusForNote, type TuningStatus } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
 
 export interface PitchMeterProps {
@@ -21,11 +23,21 @@ export interface PitchMeterProps {
   onNoteClick?: (pitchClassIndex: number) => void;
 }
 
+interface TrailPoint {
+  id: number;
+  x: number;
+  y: number;
+  status: TuningStatus;
+}
+
 const VIEWBOX_SIZE = 240;
 const CENTER = { x: VIEWBOX_SIZE / 2, y: VIEWBOX_SIZE / 2 };
 const WHEEL_RADIUS = 90;
 const BUBBLE_RADIUS = 22;
-const INDICATOR_RADIUS = 10;
+const RING_RADIUS = 20;
+const RING_STROKE_WIDTH = 5;
+const TRAIL_LENGTH = 6; // ~300ms tail at TRAIL_TICK_MS
+const TRAIL_TICK_MS = 50; // matches the pitch tracker's own detection cadence
 
 export function PitchMeter({
   detectedNote,
@@ -42,6 +54,27 @@ export function PitchMeter({
   const indicatorPosition = detectedNote
     ? pointOnCircle(angleForPitch(detectedNote.midiNumber, detectedNote.cents), WHEEL_RADIUS, CENTER)
     : null;
+
+  // Kept in sync with the latest render's computed position/status, read from inside
+  // the trail's own tick interval below (not from React's render cycle directly) —
+  // this is what lets the trail keep aging out smoothly during silence instead of
+  // getting stuck partway faded or risking a render loop tied to prop changes.
+  const currentPositionRef = useRef<{ x: number; y: number; status: TuningStatus } | null>(null);
+  useEffect(() => {
+    currentPositionRef.current =
+      indicatorPosition && status ? { x: indicatorPosition.x, y: indicatorPosition.y, status } : null;
+  });
+
+  const nextTrailIdRef = useRef(0);
+  const [trail, setTrail] = useState<TrailPoint[]>([]);
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const current = currentPositionRef.current;
+      const point: TrailPoint | null = current ? { id: nextTrailIdRef.current++, ...current } : null;
+      setTrail((prev) => advanceTrail(prev, point, TRAIL_LENGTH));
+    }, TRAIL_TICK_MS);
+    return () => clearInterval(intervalId);
+  }, []);
 
   return (
     <svg viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`} width="100%" role="img" aria-label="Roda cromática de afinação">
@@ -89,32 +122,20 @@ export function PitchMeter({
           </g>
         );
       })}
-      {indicatorPosition && status && (
-        <g data-testid="live-indicator" data-status={status}>
-          <circle
-            cx={indicatorPosition.x}
-            cy={indicatorPosition.y}
-            r={INDICATOR_RADIUS + 4}
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth={2}
-          />
-          <circle
-            cx={indicatorPosition.x}
-            cy={indicatorPosition.y}
-            r={INDICATOR_RADIUS + 2}
-            fill="none"
-            stroke="#000000"
-            strokeWidth={2}
-          />
-          <circle
-            cx={indicatorPosition.x}
-            cy={indicatorPosition.y}
-            r={INDICATOR_RADIUS}
-            fill={STATUS_COLORS[status]}
-          />
-        </g>
-      )}
+      {trail.map((point, index) => (
+        <circle
+          key={point.id}
+          data-testid={index === trail.length - 1 ? 'live-indicator' : 'live-indicator-trail'}
+          data-status={point.status}
+          cx={point.x}
+          cy={point.y}
+          r={RING_RADIUS}
+          fill="none"
+          stroke={STATUS_COLORS[point.status]}
+          strokeWidth={RING_STROKE_WIDTH}
+          opacity={(index + 1) / trail.length}
+        />
+      ))}
       {micDisconnected ? (
         <text
           data-testid="mic-disconnected-icon"

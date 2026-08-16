@@ -1,9 +1,18 @@
-// frontend/src/components/PitchMeter.test.tsx
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { PitchMeter } from './PitchMeter';
 
+const TRAIL_TICK_MS = 50;
+
 describe('PitchMeter', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('renders all 12 chromatic note bubbles', () => {
     render(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
     ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].forEach((name) => {
@@ -13,6 +22,9 @@ describe('PitchMeter', () => {
 
   it('shows no live indicator when no note is detected', () => {
     render(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.queryByTestId('live-indicator')).toBeNull();
   });
 
@@ -24,6 +36,9 @@ describe('PitchMeter', () => {
         micDisconnected={false}
       />
     );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.getByTestId('live-indicator')).toBeDefined();
   });
 
@@ -47,6 +62,9 @@ describe('PitchMeter', () => {
         micDisconnected={false}
       />
     );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.getByTestId('live-indicator').dataset.status).toBe('in-tune');
   });
 
@@ -58,6 +76,9 @@ describe('PitchMeter', () => {
         micDisconnected={false}
       />
     );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.getByTestId('live-indicator').dataset.status).toBe('off');
   });
 
@@ -69,6 +90,9 @@ describe('PitchMeter', () => {
         micDisconnected={false}
       />
     );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.getByTestId('live-indicator').dataset.status).toBe('off');
   });
 
@@ -80,6 +104,9 @@ describe('PitchMeter', () => {
         micDisconnected={false}
       />
     );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
     expect(screen.getByTestId('live-indicator').dataset.status).toBe('close');
     expect(screen.getByTestId('note-bubble-A').dataset.active).toBe('false');
   });
@@ -146,5 +173,75 @@ describe('PitchMeter', () => {
     render(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
     expect(screen.queryByTestId('center-note-label')).toBeNull();
     expect(screen.queryByTestId('mic-disconnected-icon')).toBeNull();
+  });
+
+  it('grows a fading trail behind the live indicator as ticks pass', () => {
+    render(
+      <PitchMeter
+        detectedNote={{ noteName: 'A', octave: 4, midiNumber: 69, cents: 3 }}
+        targetMidiNumber={69}
+        micDisconnected={false}
+      />
+    );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS * 3);
+    });
+    expect(screen.getAllByTestId('live-indicator-trail').length).toBe(2);
+    expect(screen.getByTestId('live-indicator')).toBeDefined();
+  });
+
+  it('caps the trail at 6 points even after many ticks', () => {
+    render(
+      <PitchMeter
+        detectedNote={{ noteName: 'A', octave: 4, midiNumber: 69, cents: 3 }}
+        targetMidiNumber={69}
+        micDisconnected={false}
+      />
+    );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS * 10);
+    });
+    expect(screen.getAllByTestId('live-indicator-trail').length).toBe(5);
+  });
+
+  it('fades the trail out one point per tick after the note stops, instead of vanishing instantly', () => {
+    const { rerender } = render(
+      <PitchMeter
+        detectedNote={{ noteName: 'A', octave: 4, midiNumber: 69, cents: 3 }}
+        targetMidiNumber={69}
+        micDisconnected={false}
+      />
+    );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS * 6);
+    });
+    expect(screen.getAllByTestId('live-indicator-trail').length).toBe(5);
+
+    rerender(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS);
+    });
+    expect(screen.getAllByTestId('live-indicator-trail').length).toBe(4);
+    expect(screen.getByTestId('live-indicator')).toBeDefined();
+  });
+
+  it('fully empties the trail after enough silent ticks', () => {
+    const { rerender } = render(
+      <PitchMeter
+        detectedNote={{ noteName: 'A', octave: 4, midiNumber: 69, cents: 3 }}
+        targetMidiNumber={69}
+        micDisconnected={false}
+      />
+    );
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS * 6);
+    });
+
+    rerender(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(TRAIL_TICK_MS * 6);
+    });
+    expect(screen.queryByTestId('live-indicator')).toBeNull();
+    expect(screen.queryAllByTestId('live-indicator-trail').length).toBe(0);
   });
 });
