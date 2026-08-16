@@ -20,7 +20,8 @@ const WINDOW_SECONDS = 4;
 const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_PER_TICK; // 640
 
 /**
- * Listens to the microphone and reports the detected note ~20 times/sec until unmounted.
+ * Listens to the microphone and reports the detected note and a rolling waveform buffer
+ * ~20 times/sec until unmounted.
  *
  * `sensitivity` is the YIN detection threshold: lower = stricter (fewer false positives
  * on noise/breath, but may miss soft/unclear pitches), higher = more lenient. It's read
