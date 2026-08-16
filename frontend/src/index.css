@@ -141,6 +141,7 @@ body {
 
 .waveform-stage > svg {
   display: block;
+  height: 100%;
 }
 
 .exercise-controls {

@@ -23,7 +23,13 @@ export function Waveform({ samples, detectedNote, targetMidiNumber, micDisconnec
       : samples.map((value, index) => `${index},${(HEIGHT / 2 - value * (HEIGHT / 2)).toFixed(2)}`).join(' ');
 
   return (
-    <svg viewBox={`0 0 ${width} ${HEIGHT}`} width="100%" role="img" aria-label="Forma de onda da voz">
+    <svg
+      viewBox={`0 0 ${width} ${HEIGHT}`}
+      width="100%"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="Forma de onda da voz"
+    >
       <polyline data-testid="waveform-trace" points={points} fill="none" stroke={color} strokeWidth={2} />
     </svg>
   );
