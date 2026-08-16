@@ -1,4 +1,12 @@
+import type { NoteInfo } from './noteUtils';
+
 export type TuningStatus = 'in-tune' | 'close' | 'off';
+
+export const STATUS_COLORS: Record<TuningStatus, string> = {
+  'in-tune': '#2ecc71',
+  close: '#f1c40f',
+  off: '#e74c3c',
+};
 
 /** Maps a cents deviation to a 0-100 horizontal gauge position (50 = perfectly in tune). */
 export function centsToGaugePercent(cents: number, maxCents = 50): number {
@@ -12,4 +20,21 @@ export function tuningStatus(cents: number): TuningStatus {
   if (abs <= 10) return 'in-tune';
   if (abs <= 25) return 'close';
   return 'off';
+}
+
+/**
+ * Derives the tuning status for a detected note, relative to an exercise's target note
+ * (if any) or the nearest chromatic note otherwise — same cents math both PitchMeter's
+ * ring indicator and the Waveform trace color themselves by.
+ */
+export function statusForNote(
+  detectedNote: NoteInfo | null,
+  targetMidiNumber: number | null
+): TuningStatus | null {
+  if (!detectedNote) return null;
+  const cents =
+    targetMidiNumber !== null
+      ? (detectedNote.midiNumber - targetMidiNumber) * 100 + detectedNote.cents
+      : detectedNote.cents;
+  return tuningStatus(cents);
 }

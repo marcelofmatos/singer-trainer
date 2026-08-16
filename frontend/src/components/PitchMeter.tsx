@@ -8,7 +8,7 @@ import {
   pointOnCircle,
   readableTextColor,
 } from '../lib/chromaticWheel';
-import { tuningStatus } from '../lib/tuningGauge';
+import { STATUS_COLORS, statusForNote } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
 
 export interface PitchMeterProps {
@@ -27,12 +27,6 @@ const WHEEL_RADIUS = 90;
 const BUBBLE_RADIUS = 22;
 const INDICATOR_RADIUS = 10;
 
-const STATUS_COLORS = {
-  'in-tune': '#2ecc71',
-  close: '#f1c40f',
-  off: '#e74c3c',
-} as const;
-
 export function PitchMeter({
   detectedNote,
   targetMidiNumber,
@@ -41,13 +35,7 @@ export function PitchMeter({
 }: PitchMeterProps) {
   const targetPitchClass = targetMidiNumber !== null ? pitchClassIndex(targetMidiNumber) : null;
 
-  // Cents relative to the exercise's target note (if any), otherwise relative to the
-  // nearest chromatic note — drives the indicator's color only, not its position.
-  const cents =
-    detectedNote && targetMidiNumber !== null
-      ? (detectedNote.midiNumber - targetMidiNumber) * 100 + detectedNote.cents
-      : (detectedNote?.cents ?? 0);
-  const status = detectedNote ? tuningStatus(cents) : null;
+  const status = statusForNote(detectedNote, targetMidiNumber);
 
   // The indicator's position is always the *absolute* sung pitch (its own pitch class
   // plus its own cents) — this is what makes it slide continuously around the wheel.
