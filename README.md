@@ -12,7 +12,8 @@ quão perto você está da nota certa.
 - **Feedback de afinação em tempo real** — detecção de pitch (algoritmo YIN) rodando
   100% no navegador, sem servidor.
 - **Exercícios prontos** — escala maior, sirene, lip trill, respiração sustentada,
-  arpejo maior, escala de 5 notas, saltos de oitava.
+  arpejo maior, escala de 5 notas, saltos de oitava, escala menor e escala menor em
+  degraus.
 - **Play/pause e mudo** — pausar congela o tom de referência e o indicador de afinação
   exatamente onde estavam, sem reiniciar o exercício.
 - **Controle de velocidade e repetição** do exercício, com preferências salvas
@@ -20,8 +21,8 @@ quão perto você está da nota certa.
 - **Sensibilidade do microfone ajustável** — calibra o quão exigente a detecção de pitch
   é ao aceitar um som como nota certa.
 - **Bolhas clicáveis** — toque em qualquer nota da roda pra ouvir como ela soa.
-- Página única com menu de abas — trocar de exercício não pede acesso ao microfone de
-  novo.
+- Página única com dropdown de exercícios — trocar de exercício não pede acesso ao
+  microfone de novo, e a última lição escolhida fica salva entre recarregamentos.
 
 ## Rodando localmente
 
