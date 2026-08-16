@@ -16,3 +16,6 @@ __pycache__/
 
 # Superpowers brainstorm visual companion sessions
 .superpowers/
+
+# Playwright MCP verification artifacts
+.playwright-mcp/
