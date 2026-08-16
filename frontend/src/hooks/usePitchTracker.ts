@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_THRESHOLD, detectPitchYIN } from '../lib/pitchDetection';
 import { frequencyToNote, type NoteInfo } from '../lib/noteUtils';
+import { downsampleWaveform } from '../lib/waveformSampling';
 
 export type PitchTrackerStatus = 'requesting' | 'listening' | 'error';
 
@@ -8,10 +9,15 @@ export interface PitchTrackerState {
   status: PitchTrackerStatus;
   errorMessage: string | null;
   currentNote: NoteInfo | null;
+  /** Rolling window of downsampled signed amplitude values, oldest first, range [-1, 1]. */
+  waveform: number[];
 }
 
 const BUFFER_SIZE = 4096;
 const DETECTION_INTERVAL_MS = 50; // naive YIN is O(n^2); 20Hz updates keep CPU sane and still look real-time
+const POINTS_PER_TICK = 8;
+const WINDOW_SECONDS = 4;
+const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_PER_TICK; // 640
 
 /**
  * Listens to the microphone and reports the detected note ~20 times/sec until unmounted.
@@ -26,6 +32,7 @@ export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchT
     status: 'requesting',
     errorMessage: null,
     currentNote: null,
+    waveform: [],
   });
 
   const sensitivityRef = useRef(sensitivity);
@@ -62,6 +69,7 @@ export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchT
           setState((prev) => ({
             ...prev,
             currentNote: result ? frequencyToNote(result.frequency) : null,
+            waveform: [...prev.waveform, ...downsampleWaveform(buffer, POINTS_PER_TICK)].slice(-WINDOW_POINTS),
           }));
         }, DETECTION_INTERVAL_MS);
       } catch (err) {
@@ -71,6 +79,7 @@ export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchT
             errorMessage:
               err instanceof Error ? err.message : 'Não foi possível acessar o microfone.',
             currentNote: null,
+            waveform: [],
           });
         }
       }
