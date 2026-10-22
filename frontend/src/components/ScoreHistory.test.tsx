@@ -36,12 +36,14 @@ describe('ScoreHistory', () => {
         onClose={() => {}}
         history={[
           record({ exerciseName: 'Escala Maior', finishedAt: 1, hitSeconds: 5 }),
-          record({ exerciseId: 'arpejo', exerciseName: 'Arpejo Maior', finishedAt: 2, hitSeconds: 9 }),
+          record({ exerciseId: 'arpejo', exerciseName: 'Arpejo Maior', finishedAt: 2, hitSeconds: 9, inputLabel: 'Monitor', inputId: 'lane-2' }),
         ]}
       />
     );
     const rows = within(screen.getByRole('table', { name: 'Últimas passadas' })).getAllByRole('row').slice(1);
+    expect(screen.getByRole('table', { name: 'Últimas passadas' }).textContent).toContain('Entrada');
     expect(rows[0].textContent).toContain('Arpejo Maior');
+    expect(rows[0].textContent).toContain('Monitor');
     expect(rows[0].textContent).toContain('9,0 s');
     expect(rows[0].textContent).toContain('90%');
     expect(rows[1].textContent).toContain('Escala Maior');
@@ -58,6 +60,19 @@ describe('ScoreHistory', () => {
     const records = screen.getByRole('table', { name: 'Recordes' });
     expect(records.textContent).toContain('Escala Maior');
     expect(records.textContent).toContain('80%');
+  });
+
+  it('lists records per input', () => {
+    render(
+      <ScoreHistory
+        open
+        onClose={() => {}}
+        history={[record({ hitSeconds: 8 }), record({ inputId: 'lane-2', inputLabel: 'Monitor', hitSeconds: 2 })]}
+      />
+    );
+    const records = screen.getByRole('table', { name: 'Recordes' });
+    expect(records.textContent).toContain('Escala Maior · Monitor');
+    expect(records.textContent).toContain('20%');
   });
 
   it('calls onClose from the close button', () => {

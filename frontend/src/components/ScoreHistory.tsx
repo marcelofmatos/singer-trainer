@@ -54,6 +54,7 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
               <tr>
                 <th scope="col">Quando</th>
                 <th scope="col">Exercício</th>
+                <th scope="col">Entrada</th>
                 <th scope="col">Afinado</th>
                 <th scope="col">Acerto</th>
               </tr>
@@ -65,6 +66,7 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
                     {new Date(entry.finishedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                   </td>
                   <td>{entry.exerciseName}</td>
+                  <td>{entry.inputLabel ?? 'Microfone'}</td>
                   <td>{formatSeconds(entry.hitSeconds)}</td>
                   <td>{hitPercent(entry)}%</td>
                 </tr>
