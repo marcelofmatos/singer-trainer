@@ -290,7 +290,12 @@ describe('ExercisePlayer keyboard shortcuts', () => {
   });
 
   it('shows the active microphone name', async () => {
-    const track = { stop: vi.fn(), label: 'USB Audio Device' };
+    const track = {
+      stop: vi.fn(),
+      label: 'USB Audio Device',
+      getSettings: () => ({ deviceId: 'usb' }),
+      addEventListener: vi.fn(),
+    };
     Object.defineProperty(navigator, 'mediaDevices', {
       value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [track], getAudioTracks: () => [track] })) },
       configurable: true,

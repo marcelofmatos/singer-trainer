@@ -1,11 +1,12 @@
 // frontend/src/hooks/usePitchTracker.test.ts
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { usePitchTracker } from './usePitchTracker';
 
 let stopSpies: ReturnType<typeof vi.fn>[] = [];
 let getUserMedia: ReturnType<typeof vi.fn>;
 let trackLabel = 'USB Audio Device';
+let endedListeners: Array<() => void> = [];
 
 class MockAudioContext {
   sampleRate = 44100;
@@ -24,10 +25,19 @@ describe('usePitchTracker', () => {
   beforeEach(() => {
     stopSpies = [];
     trackLabel = 'USB Audio Device';
-    getUserMedia = vi.fn(async () => {
+    endedListeners = [];
+    getUserMedia = vi.fn(async (constraints: { audio: true | { deviceId: { exact: string } } }) => {
       const stop = vi.fn();
       stopSpies.push(stop);
-      const track = { stop, label: trackLabel };
+      const deviceId = constraints.audio === true ? 'default' : constraints.audio.deviceId.exact;
+      const track = {
+        stop,
+        label: trackLabel,
+        getSettings: () => ({ deviceId }),
+        addEventListener: (type: string, listener: () => void) => {
+          if (type === 'ended') endedListeners.push(listener);
+        },
+      };
       return { getTracks: () => [track], getAudioTracks: () => [track] };
     });
     vi.stubGlobal('AudioContext', MockAudioContext);
@@ -45,6 +55,7 @@ describe('usePitchTracker', () => {
     const { result } = renderHook(() => usePitchTracker(0.15, true));
     await waitFor(() => expect(result.current.status).toBe('listening'));
     expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
   });
 
   it('does not open the microphone and reports "off" when disabled', () => {
@@ -90,5 +101,47 @@ describe('usePitchTracker', () => {
     await waitFor(() => expect(result.current.deviceName).toBe('USB Audio Device'));
     rerender({ enabled: false });
     expect(result.current.deviceName).toBeNull();
+  });
+
+  it('opens the requested microphone and reports the device in use', async () => {
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'usb'));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+    expect(result.current.deviceId).toBe('usb');
+  });
+
+  it('falls back to the default microphone when the requested one is not connected', async () => {
+    getUserMedia.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'OverconstrainedError' }));
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'unplugged'));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: true });
+    expect(result.current.deviceId).toBe('default');
+  });
+
+  it('reports other errors without falling back', async () => {
+    getUserMedia.mockRejectedValueOnce(Object.assign(new Error('busy'), { name: 'NotReadableError' }));
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'usb'));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+    expect(result.current.deviceId).toBeNull();
+  });
+
+  it('reopens the microphone when switching devices', async () => {
+    const { result, rerender } = renderHook(({ id }) => usePitchTracker(0.15, true, id), {
+      initialProps: { id: null as string | null },
+    });
+    await waitFor(() => expect(result.current.deviceId).toBe('default'));
+    rerender({ id: 'usb' });
+    await waitFor(() => expect(result.current.deviceId).toBe('usb'));
+    expect(stopSpies[0]).toHaveBeenCalled();
+  });
+
+  it('reopens the microphone when its track ends (unplugged)', async () => {
+    const { result } = renderHook(() => usePitchTracker(0.15, true));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    act(() => endedListeners[0]());
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(stopSpies[0]).toHaveBeenCalled();
   });
 });

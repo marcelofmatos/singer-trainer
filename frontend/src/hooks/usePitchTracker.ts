@@ -13,6 +13,8 @@ export interface PitchTrackerState {
   waveform: number[];
   /** Label of the active microphone while listening; null when unknown, off or failed. */
   deviceName: string | null;
+  /** deviceId of the microphone actually in use while listening; null otherwise. */
+  deviceId: string | null;
 }
 
 const BUFFER_SIZE = 4096;
@@ -30,10 +32,14 @@ const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_P
  * on noise/breath, but may miss soft/unclear pitches), higher = more lenient. It's read
  * via a ref inside the polling loop so adjusting it never re-requests microphone access
  * or tears down the existing audio graph.
+ *
+ * `deviceId` picks the microphone; when it isn't connected the system default is used
+ * instead. If the open track ends (e.g. the microphone is unplugged) it is reopened.
  */
 export function usePitchTracker(
   sensitivity: number = DEFAULT_THRESHOLD,
-  enabled: boolean = true
+  enabled: boolean = true,
+  deviceId: string | null = null
 ): PitchTrackerState {
   const [state, setState] = useState<PitchTrackerState>({
     status: enabled ? 'requesting' : 'off',
@@ -41,6 +47,7 @@ export function usePitchTracker(
     currentNote: null,
     waveform: [],
     deviceName: null,
+    deviceId: null,
   });
 
   const sensitivityRef = useRef(sensitivity);
@@ -48,21 +55,36 @@ export function usePitchTracker(
     sensitivityRef.current = sensitivity;
   }, [sensitivity]);
 
+  // Bumped when the open track ends, so the effect below reopens the microphone.
+  const [reopenCount, setReopenCount] = useState(0);
+
   useEffect(() => {
     if (!enabled) {
-      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [], deviceName: null });
+      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null });
       return;
     }
-    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [], deviceName: null });
+    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null });
 
     let cancelled = false;
     let stream: MediaStream | null = null;
     let audioContext: AudioContext | null = null;
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
+    function openStream(): Promise<MediaStream> {
+      if (!deviceId) return navigator.mediaDevices.getUserMedia({ audio: true });
+      return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } }).catch((err) => {
+        // The chosen microphone isn't connected — fall back to the system default.
+        const name = (err as { name?: string } | null)?.name;
+        if (name === 'OverconstrainedError' || name === 'NotFoundError') {
+          return navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+        throw err;
+      });
+    }
+
     async function start() {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await openStream();
         if (cancelled) {
           stream.getTracks().forEach((track) => track.stop());
           return;
@@ -75,8 +97,13 @@ export function usePitchTracker(
         source.connect(analyser);
 
         const buffer = new Float32Array(analyser.fftSize);
-        const deviceName = stream.getAudioTracks()[0]?.label || null;
-        setState((prev) => ({ ...prev, status: 'listening', deviceName }));
+        const track = stream.getAudioTracks()[0];
+        const deviceName = track?.label || null;
+        const activeDeviceId = track?.getSettings?.().deviceId ?? null;
+        track?.addEventListener('ended', () => {
+          if (!cancelled) setReopenCount((count) => count + 1);
+        });
+        setState((prev) => ({ ...prev, status: 'listening', deviceName, deviceId: activeDeviceId }));
 
         intervalId = setInterval(() => {
           analyser.getFloatTimeDomainData(buffer);
@@ -96,6 +123,7 @@ export function usePitchTracker(
             currentNote: null,
             waveform: [],
             deviceName: null,
+    deviceId: null,
           });
         }
       }
@@ -109,7 +137,7 @@ export function usePitchTracker(
       stream?.getTracks().forEach((track) => track.stop());
       audioContext?.close();
     };
-  }, [enabled]);
+  }, [enabled, deviceId, reopenCount]);
 
   return state;
 }
