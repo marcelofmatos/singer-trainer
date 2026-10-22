@@ -123,7 +123,7 @@ export function usePitchTracker(
             currentNote: null,
             waveform: [],
             deviceName: null,
-    deviceId: null,
+            deviceId: null,
           });
         }
       }
