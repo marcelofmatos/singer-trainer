@@ -110,6 +110,14 @@ describe('usePitchTracker', () => {
     expect(result.current.deviceId).toBe('usb');
   });
 
+  it('reports a disconnected input instead of falling back when asked not to', async () => {
+    getUserMedia.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'OverconstrainedError' }));
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'unplugged', { fallbackToDefault: false }));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.errorMessage).toBe('Entrada desconectada');
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to the default microphone when the requested one is not connected', async () => {
     getUserMedia.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'OverconstrainedError' }));
     const { result } = renderHook(() => usePitchTracker(0.15, true, 'unplugged'));

@@ -34,12 +34,13 @@ const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_P
  * or tears down the existing audio graph.
  *
  * `deviceId` picks the microphone; when it isn't connected the system default is used
- * instead. If the open track ends (e.g. the microphone is unplugged) it is reopened.
+ * instead (with `fallbackToDefault: false` it is reported as the error 'Entrada desconectada'). If the open track ends (e.g. the microphone is unplugged) it is reopened.
  */
 export function usePitchTracker(
   sensitivity: number = DEFAULT_THRESHOLD,
   enabled: boolean = true,
-  deviceId: string | null = null
+  deviceId: string | null = null,
+  { fallbackToDefault = true }: { fallbackToDefault?: boolean } = {}
 ): PitchTrackerState {
   const [state, setState] = useState<PitchTrackerState>({
     status: enabled ? 'requesting' : 'off',
@@ -76,6 +77,7 @@ export function usePitchTracker(
         // The chosen microphone isn't connected — fall back to the system default.
         const name = (err as { name?: string } | null)?.name;
         if (name === 'OverconstrainedError' || name === 'NotFoundError') {
+          if (!fallbackToDefault) throw new Error('Entrada desconectada');
           return navigator.mediaDevices.getUserMedia({ audio: true });
         }
         throw err;
@@ -137,7 +139,7 @@ export function usePitchTracker(
       stream?.getTracks().forEach((track) => track.stop());
       audioContext?.close();
     };
-  }, [enabled, deviceId, reopenCount]);
+  }, [enabled, deviceId, fallbackToDefault, reopenCount]);
 
   return state;
 }

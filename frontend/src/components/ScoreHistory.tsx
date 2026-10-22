@@ -1,7 +1,7 @@
 // frontend/src/components/ScoreHistory.tsx
 import { useEffect, useRef } from 'react';
 import { formatSeconds, hitPercent } from '../lib/scoring';
-import { bestPercentByExercise, type ScoreRecord } from '../lib/scoreHistory';
+import { bestScores, type ScoreRecord } from '../lib/scoreHistory';
 
 export interface ScoreHistoryProps {
   open: boolean;
@@ -22,8 +22,6 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
     if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  const best = bestPercentByExercise(history);
-  const exerciseNames = new Map(history.map((entry) => [entry.exerciseId, entry.exerciseName]));
   const firstShown = Math.max(0, history.length - RECENT_COUNT);
   const recent = history.slice(firstShown).reverse();
 
@@ -39,10 +37,13 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
           <table className="score-history-table" aria-label="Recordes">
             <caption>Recordes</caption>
             <tbody>
-              {Object.entries(best).map(([exerciseId, percent]) => (
-                <tr key={exerciseId}>
-                  <th scope="row">{exerciseNames.get(exerciseId)}</th>
-                  <td>{percent}%</td>
+              {bestScores(history).map((score) => (
+                <tr key={`${score.exerciseName}|${score.inputLabel ?? ''}`}>
+                  <th scope="row">
+                    {score.exerciseName}
+                    {score.inputLabel ? ` · ${score.inputLabel}` : ''}
+                  </th>
+                  <td>{score.percent}%</td>
                 </tr>
               ))}
             </tbody>

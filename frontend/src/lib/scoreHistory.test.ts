@@ -2,10 +2,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendScoreRecord,
-  bestPercentByExercise,
+  bestScores,
   loadScoreHistory,
   MAX_HISTORY,
   totalTally,
+  totalTallyForInput,
   type ScoreRecord,
 } from './scoreHistory';
 
@@ -75,13 +76,34 @@ describe('scoreHistory', () => {
     }
   });
 
-  it('finds the best percentage per exercise', () => {
+  it('finds the best percentage per exercise and input', () => {
     const history = [
-      record({ exerciseId: 'a', targetSeconds: 10, hitSeconds: 5 }),
-      record({ exerciseId: 'a', targetSeconds: 10, hitSeconds: 8 }),
-      record({ exerciseId: 'b', targetSeconds: 4, hitSeconds: 1 }),
+      record({ exerciseId: 'a', exerciseName: 'A', targetSeconds: 10, hitSeconds: 5 }),
+      record({ exerciseId: 'a', exerciseName: 'A', targetSeconds: 10, hitSeconds: 8 }),
+      record({ exerciseId: 'a', exerciseName: 'A', inputId: 'lane-2', inputLabel: 'Monitor', targetSeconds: 4, hitSeconds: 1 }),
     ];
-    expect(bestPercentByExercise(history)).toEqual({ a: 80, b: 25 });
+    expect(bestScores(history)).toEqual([
+      { exerciseName: 'A', inputLabel: null, percent: 80 },
+      { exerciseName: 'A', inputLabel: 'Monitor', percent: 25 },
+    ]);
+  });
+
+  it('sums the records of one input, counting records without input as the primary lane', () => {
+    const history = [
+      record({ targetSeconds: 10, hitSeconds: 5 }),
+      record({ inputId: 'primary', targetSeconds: 2, hitSeconds: 2 }),
+      record({ inputId: 'lane-2', targetSeconds: 100, hitSeconds: 0 }),
+    ];
+    expect(totalTallyForInput(history, 'primary')).toEqual({ targetSeconds: 12, hitSeconds: 7 });
+    expect(totalTallyForInput(history, 'lane-2')).toEqual({ targetSeconds: 100, hitSeconds: 0 });
+  });
+
+  it('accepts records with input fields and rejects invalid ones', () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify([record({ inputId: 'lane-2', inputLabel: 'Monitor' }), { ...record(), inputId: 3 }])
+    );
+    expect(loadScoreHistory()).toEqual([record({ inputId: 'lane-2', inputLabel: 'Monitor' })]);
   });
 
   it('sums every record into one tally', () => {

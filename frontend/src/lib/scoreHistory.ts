@@ -3,6 +3,7 @@ import { addTallies, EMPTY_TALLY, hitPercent, type ScoreTally } from './scoring'
 
 const STORAGE_KEY = 'singer-trainer:score-history';
 export const MAX_HISTORY = 500;
+const PRIMARY_INPUT_ID = 'primary';
 
 /** One completed pass of an exercise. */
 export interface ScoreRecord extends ScoreTally {
@@ -11,6 +12,9 @@ export interface ScoreRecord extends ScoreTally {
   /** Epoch milliseconds. */
   finishedAt: number;
   playbackRate: number;
+  /** Lane that produced the record; absent on records from before multiple inputs (= primary). */
+  inputId?: string;
+  inputLabel?: string;
 }
 
 function isScoreRecord(value: unknown): value is ScoreRecord {
@@ -22,7 +26,9 @@ function isScoreRecord(value: unknown): value is ScoreRecord {
     typeof entry.finishedAt === 'number' &&
     typeof entry.playbackRate === 'number' &&
     typeof entry.targetSeconds === 'number' &&
-    typeof entry.hitSeconds === 'number'
+    typeof entry.hitSeconds === 'number' &&
+    (entry.inputId === undefined || typeof entry.inputId === 'string') &&
+    (entry.inputLabel === undefined || typeof entry.inputLabel === 'string')
   );
 }
 
@@ -47,14 +53,36 @@ export function appendScoreRecord(record: ScoreRecord): ScoreRecord[] {
   return history;
 }
 
-export function bestPercentByExercise(history: ScoreRecord[]): Record<string, number> {
-  const best: Record<string, number> = {};
+export interface BestScore {
+  exerciseName: string;
+  /** null for the primary lane. */
+  inputLabel: string | null;
+  percent: number;
+}
+
+/** Best percentage per exercise and input, in order of first appearance. */
+export function bestScores(history: ScoreRecord[]): BestScore[] {
+  const best = new Map<string, BestScore>();
   for (const entry of history) {
-    best[entry.exerciseId] = Math.max(best[entry.exerciseId] ?? 0, hitPercent(entry));
+    const inputId = entry.inputId ?? PRIMARY_INPUT_ID;
+    const key = `${entry.exerciseId}|${inputId}`;
+    const percent = hitPercent(entry);
+    const current = best.get(key);
+    if (!current || percent > current.percent) {
+      best.set(key, {
+        exerciseName: entry.exerciseName,
+        inputLabel: inputId === PRIMARY_INPUT_ID ? null : (entry.inputLabel ?? null),
+        percent,
+      });
+    }
   }
-  return best;
+  return [...best.values()];
 }
 
 export function totalTally(history: ScoreRecord[]): ScoreTally {
   return history.reduce<ScoreTally>((sum, entry) => addTallies(sum, entry), EMPTY_TALLY);
+}
+
+export function totalTallyForInput(history: ScoreRecord[], inputId: string): ScoreTally {
+  return totalTally(history.filter((entry) => (entry.inputId ?? PRIMARY_INPUT_ID) === inputId));
 }
