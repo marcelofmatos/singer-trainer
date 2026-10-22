@@ -23,9 +23,9 @@ const PLAYBACK_RATE_STEP = 0.25;
 const MIN_SENSITIVITY = 0.05;
 const MAX_SENSITIVITY = 0.35;
 const SENSITIVITY_STEP = 0.05;
-// The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 // Only stepping actions make sense while a key is held; toggles would flicker.
 const REPEATABLE_ACTIONS: ShortcutAction[] = ['slower', 'faster', 'lessSensitive', 'moreSensitive'];
+// The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 
