@@ -49,10 +49,11 @@ function keysOwnedByFocus(target: EventTarget | null): 'all' | string[] {
   if (target.matches('select, textarea')) return 'all';
   if (target instanceof HTMLInputElement) {
     if (target.type === 'range') return [...ARROW_KEYS, 'PageUp', 'PageDown'];
-    if (target.type === 'checkbox') return [' ', ...ARROW_KEYS];
+    if (target.type === 'checkbox') return [' '];
     return 'all';
   }
-  if (target.matches('button, [role="button"]')) return [' ', ...ARROW_KEYS];
+  if (target.matches('[role="button"]')) return [' ', ...ARROW_KEYS];
+  if (target.matches('button')) return [' '];
   return [];
 }
 

@@ -39,8 +39,8 @@ Letras valem em minúscula e maiúscula (Caps Lock ligado não quebra os atalhos
   continuam valendo (senão, depois de clicar um botão com o mouse, o foco fica nele e
   nenhum atalho funcionaria):
   - `select`, `textarea` e `input` de texto: ignora todas as teclas (digitação/typeahead).
-  - `button`, `input[type=checkbox]` e `role="button"` (inclui as notas da roda): ignora
-    Espaço (o próprio elemento é acionado) e as setas (navegação da roda).
+  - `button` e `input[type=checkbox]`: ignora só Espaço (o próprio elemento é acionado).
+  - `role="button"` (as notas da roda): ignora Espaço e as setas (navegação da roda).
   - `input[type=range]`: ignora setas, PageUp e PageDown (o slider se move).
 - Com Ctrl, Alt ou Meta pressionados (não roubar atalhos do navegador/SO). Shift é
   permitido (necessário para `?`).
