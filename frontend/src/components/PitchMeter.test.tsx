@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { PitchMeter } from './PitchMeter';
+import { createRef } from 'react';
+import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
 
 const TRAIL_TICK_MS = 50;
 
@@ -255,32 +256,62 @@ describe('PitchMeter', () => {
     expect(screen.getByTestId('note-bubble-C').getAttribute('tabindex')).toBe('0');
   });
 
-  it('moves focus around the wheel with the arrow keys, wrapping B<->C', () => {
+  function renderWheel() {
+    const wheel = createRef<PitchMeterHandle>();
     render(
-      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
+      <PitchMeter
+        ref={wheel}
+        detectedNote={null}
+        targetMidiNumber={null}
+        micDisconnected={false}
+        onNoteClick={() => {}}
+      />
     );
-    const c = screen.getByTestId('note-bubble-C');
-    act(() => c.focus());
+    return wheel;
+  }
 
-    fireEvent.keyDown(c, { key: 'ArrowRight' });
-    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
-
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
-    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-B'));
-
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
-    expect(document.activeElement).toBe(c);
-    expect(screen.getByTestId('note-bubble-B').getAttribute('tabindex')).toBe('-1');
+  it('enters the wheel at the selected note on the first navigation, without advancing', () => {
+    const wheel = renderWheel();
+    act(() => wheel.current!.navigate('next'));
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
   });
 
-  it('jumps back to C with Home', () => {
-    render(
-      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
-    );
-    const g = screen.getByTestId('note-bubble-G');
-    act(() => g.focus());
-    fireEvent.keyDown(g, { key: 'Home' });
+  it('moves around the wheel from the focused note, wrapping B<->C', () => {
+    const wheel = renderWheel();
+    act(() => wheel.current!.navigate('next'));
+    act(() => wheel.current!.navigate('next'));
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
+
+    act(() => wheel.current!.navigate('previous'));
+    act(() => wheel.current!.navigate('previous'));
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-B'));
+    expect(screen.getByTestId('note-bubble-B').getAttribute('tabindex')).toBe('0');
+    expect(screen.getByTestId('note-bubble-C').getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('re-enters at the last selected note after focus leaves the wheel', () => {
+    const wheel = renderWheel();
+    act(() => wheel.current!.navigate('next'));
+    act(() => wheel.current!.navigate('next'));
+    act(() => (document.activeElement as HTMLElement).blur());
+    act(() => wheel.current!.navigate('previous'));
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
+  });
+
+  it('goes to C with first, from inside or outside the wheel', () => {
+    const wheel = renderWheel();
+    act(() => wheel.current!.navigate('next'));
+    act(() => wheel.current!.navigate('next'));
+    act(() => wheel.current!.navigate('first'));
     expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
+  });
+
+  it('does not play the note on Space (Space is the global play/pause)', () => {
+    const handleClick = vi.fn();
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={handleClick} />
+    );
+    fireEvent.keyDown(screen.getByTestId('note-bubble-A'), { key: ' ' });
+    expect(handleClick).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,5 @@
 // frontend/src/components/PitchMeter.tsx
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
 import {
   CHROMATIC_NOTE_COLORS,
   CHROMATIC_NOTE_NAMES,
@@ -23,6 +23,14 @@ export interface PitchMeterProps {
   onNoteClick?: (pitchClassIndex: number) => void;
 }
 
+export interface PitchMeterHandle {
+  /**
+   * Moves the keyboard selection around the wheel and focuses it. With focus outside the
+   * wheel, 'next'/'previous' just enter it at the last selected note; 'first' always goes to C.
+   */
+  navigate(direction: 'next' | 'previous' | 'first'): void;
+}
+
 interface TrailPoint {
   id: number;
   x: number;
@@ -40,12 +48,10 @@ const TRAIL_LENGTH = 6; // ~300ms tail at TRAIL_TICK_MS
 const TRAIL_TICK_MS = 50; // matches the pitch tracker's own detection cadence
 const NOTE_COUNT = CHROMATIC_NOTE_NAMES.length;
 
-export function PitchMeter({
-  detectedNote,
-  targetMidiNumber,
-  micDisconnected,
-  onNoteClick,
-}: PitchMeterProps) {
+export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function PitchMeter(
+  { detectedNote, targetMidiNumber, micDisconnected, onNoteClick },
+  ref
+) {
   const targetPitchClass = targetMidiNumber !== null ? pitchClassIndex(targetMidiNumber) : null;
 
   const status = statusForNote(detectedNote, targetMidiNumber);
@@ -77,7 +83,8 @@ export function PitchMeter({
     return () => clearInterval(intervalId);
   }, []);
 
-  // Roving tabindex: the wheel is one tab stop; arrows move focus between bubbles.
+  // Roving tabindex: the wheel is one tab stop; the global arrow shortcuts move the
+  // selection through `navigate`.
   const [focusableIndex, setFocusableIndex] = useState(0);
   const bubbleRefs = useRef<(SVGGElement | null)[]>([]);
 
@@ -86,28 +93,26 @@ export function PitchMeter({
     bubbleRefs.current[index]?.focus();
   }
 
-  function handleBubbleKeyDown(event: KeyboardEvent, index: number) {
-    if (!onNoteClick) return;
-    switch (event.key) {
-      case 'Enter':
-      case ' ':
-        onNoteClick(index);
-        break;
-      case 'ArrowRight':
-      case 'ArrowDown':
-        moveFocus((index + 1) % NOTE_COUNT);
-        break;
-      case 'ArrowLeft':
-      case 'ArrowUp':
-        moveFocus((index + NOTE_COUNT - 1) % NOTE_COUNT);
-        break;
-      case 'Home':
+  useImperativeHandle(ref, () => ({
+    navigate(direction) {
+      if (direction === 'first') {
         moveFocus(0);
-        break;
-      default:
         return;
-    }
+      }
+      const focusedIndex = bubbleRefs.current.findIndex((bubble) => bubble !== null && bubble === document.activeElement);
+      if (focusedIndex === -1) {
+        moveFocus(focusableIndex);
+        return;
+      }
+      const step = direction === 'next' ? 1 : NOTE_COUNT - 1;
+      moveFocus((focusedIndex + step) % NOTE_COUNT);
+    },
+  }));
+
+  function handleBubbleKeyDown(event: KeyboardEvent, index: number) {
+    if (!onNoteClick || event.key !== 'Enter') return;
     event.preventDefault();
+    onNoteClick(index);
   }
 
   return (
@@ -199,4 +204,4 @@ export function PitchMeter({
       )}
     </svg>
   );
-}
+});
