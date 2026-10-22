@@ -15,6 +15,12 @@ export default function App() {
     saveLastExerciseId(activeExerciseId);
   }, [activeExerciseId]);
 
+  function selectAdjacentExercise(offset: number) {
+    const index = BUILTIN_EXERCISES.indexOf(activeExercise);
+    const count = BUILTIN_EXERCISES.length;
+    setActiveExerciseId(BUILTIN_EXERCISES[(index + offset + count) % count].id);
+  }
+
   return (
     <main className="app">
       <header className="app-header">
@@ -35,7 +41,11 @@ export default function App() {
         ))}
       </select>
 
-      <ExercisePlayer exercise={activeExercise} />
+      <ExercisePlayer
+        exercise={activeExercise}
+        onPreviousExercise={() => selectAdjacentExercise(-1)}
+        onNextExercise={() => selectAdjacentExercise(1)}
+      />
     </main>
   );
 }

@@ -50,4 +50,25 @@ describe('App', () => {
     const restoredSelect = screen.getByLabelText('Exercício') as HTMLSelectElement;
     expect(restoredSelect.value).toBe(thirdExercise.id);
   });
+
+  it('goes to the next exercise with PageDown and wraps from the last to the first', () => {
+    render(<App />);
+    fireEvent.keyDown(document.body, { key: 'PageDown' });
+    expect(screen.getByRole('heading', { name: BUILTIN_EXERCISES[1].name })).toBeDefined();
+
+    const last = BUILTIN_EXERCISES[BUILTIN_EXERCISES.length - 1];
+    fireEvent.change(screen.getByLabelText('Exercício'), { target: { value: last.id } });
+    fireEvent.keyDown(document.body, { key: ']' });
+    expect(screen.getByRole('heading', { name: BUILTIN_EXERCISES[0].name })).toBeDefined();
+  });
+
+  it('goes to the previous exercise with PageUp and wraps from the first to the last', () => {
+    render(<App />);
+    fireEvent.keyDown(document.body, { key: 'PageUp' });
+    const last = BUILTIN_EXERCISES[BUILTIN_EXERCISES.length - 1];
+    expect(screen.getByRole('heading', { name: last.name })).toBeDefined();
+
+    fireEvent.keyDown(document.body, { key: '[' });
+    expect(screen.getByRole('heading', { name: BUILTIN_EXERCISES[BUILTIN_EXERCISES.length - 2].name })).toBeDefined();
+  });
 });
