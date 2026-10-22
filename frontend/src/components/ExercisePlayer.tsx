@@ -6,11 +6,15 @@ import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbac
 import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
+import { resolveShortcut, stepWithin } from '../lib/keyboardShortcuts';
+import { KeyboardHelp } from './KeyboardHelp';
 import { PitchMeter } from './PitchMeter';
 import { Waveform } from './Waveform';
 
 export interface ExercisePlayerProps {
   exercise: Exercise;
+  onPreviousExercise: () => void;
+  onNextExercise: () => void;
 }
 
 const MIN_PLAYBACK_RATE = 0.5;
@@ -23,7 +27,7 @@ const SENSITIVITY_STEP = 0.05;
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 
-export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
+export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
@@ -33,9 +37,11 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
   const [playing, setPlaying] = useState(true);
   const [ended, setEnded] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
-  const pitchTracker = usePitchTracker(micSensitivity);
+  const pitchTracker = usePitchTracker(micSensitivity, micEnabled);
 
   // Read via refs inside the effect below so toggling these controls mid-playback
   // doesn't restart the currently-playing cycle from scratch.
@@ -150,6 +156,59 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
     }
   }
 
+  // One document-level listener for the whole session; it calls through a ref that is
+  // refreshed every render, so shortcuts always act on the current state.
+  const handleKeyDownRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  useEffect(() => {
+    handleKeyDownRef.current = (event) => {
+      if (helpOpen) return;
+      const action = resolveShortcut(event);
+      if (!action) return;
+      event.preventDefault();
+      switch (action) {
+        case 'togglePlay':
+          togglePlaying();
+          break;
+        case 'toggleMute':
+          setMuted((m) => !m);
+          break;
+        case 'toggleMic':
+          setMicEnabled((on) => !on);
+          break;
+        case 'toggleLoop':
+          setLoop((l) => !l);
+          break;
+        case 'slower':
+          setPlaybackRate((r) => stepWithin(r, -PLAYBACK_RATE_STEP, MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE));
+          break;
+        case 'faster':
+          setPlaybackRate((r) => stepWithin(r, PLAYBACK_RATE_STEP, MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE));
+          break;
+        case 'lessSensitive':
+          setMicSensitivity((s) => stepWithin(s, -SENSITIVITY_STEP, MIN_SENSITIVITY, MAX_SENSITIVITY));
+          break;
+        case 'moreSensitive':
+          setMicSensitivity((s) => stepWithin(s, SENSITIVITY_STEP, MIN_SENSITIVITY, MAX_SENSITIVITY));
+          break;
+        case 'previousExercise':
+          onPreviousExercise();
+          break;
+        case 'nextExercise':
+          onNextExercise();
+          break;
+        case 'showHelp':
+          setHelpOpen(true);
+          break;
+      }
+    };
+  });
+
+  useEffect(() => {
+    const listener = (event: KeyboardEvent) => handleKeyDownRef.current(event);
+    document.addEventListener('keydown', listener);
+    return () => document.removeEventListener('keydown', listener);
+  }, []);
+
   return (
     <section className="exercise-panel">
       <div className="exercise-info">
@@ -164,6 +223,7 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
             Erro ao acessar o microfone: {pitchTracker.errorMessage}
           </p>
         )}
+        {pitchTracker.status === 'off' && <p className="status-message">Microfone desligado</p>}
         {toneError && (
           <p className="status-message" role="alert">
             Erro ao tocar o áudio de referência: {toneError}
@@ -212,6 +272,16 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
           {muted ? '🔇' : '🔊'}
         </button>
 
+        <button
+          type="button"
+          className={micEnabled ? 'icon-button' : 'icon-button is-off'}
+          onClick={() => setMicEnabled((on) => !on)}
+          aria-pressed={!micEnabled}
+          aria-label={micEnabled ? 'Desligar microfone' : 'Ligar microfone'}
+        >
+          🎙️
+        </button>
+
         <label className="speed-control">
           Velocidade
           <input
@@ -246,7 +316,16 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
           />
           <span className="speed-value">{micSensitivity.toFixed(2)}</span>
         </label>
+        <button
+          type="button"
+          className="icon-button"
+          onClick={() => setHelpOpen(true)}
+          aria-label="Atalhos de teclado"
+        >
+          ⌨️
+        </button>
       </div>
+      <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </section>
   );
 }

@@ -73,8 +73,23 @@ function advance(ms: number) {
   });
 }
 
+function renderPlayer(overrides: { onPreviousExercise?: () => void; onNextExercise?: () => void } = {}) {
+  return render(
+    <ExercisePlayer
+      exercise={TEST_EXERCISE}
+      onPreviousExercise={overrides.onPreviousExercise ?? (() => {})}
+      onNextExercise={overrides.onNextExercise ?? (() => {})}
+    />
+  );
+}
+
+function press(key: string, target: Element = document.body, init: KeyboardEventInit = {}) {
+  fireEvent.keyDown(target, { key, ...init });
+}
+
 describe('ExercisePlayer', () => {
   beforeEach(() => {
+    localStorage.clear();
     mockClockMs = 0;
     vi.stubGlobal('AudioContext', MockAudioContext);
     vi.useFakeTimers();
@@ -86,7 +101,7 @@ describe('ExercisePlayer', () => {
   });
 
   it('offers a restart affordance once the exercise ends without looping', () => {
-    render(<ExercisePlayer exercise={TEST_EXERCISE} />);
+    renderPlayer();
 
     // Exercise duration is 0.2s; poll ticks every 100ms.
     advance(100);
@@ -96,7 +111,7 @@ describe('ExercisePlayer', () => {
   });
 
   it('restarts playback from the beginning when play is pressed after the exercise ends', () => {
-    render(<ExercisePlayer exercise={TEST_EXERCISE} />);
+    renderPlayer();
 
     advance(100);
     advance(100);
@@ -109,5 +124,118 @@ describe('ExercisePlayer', () => {
     advance(100);
     advance(100);
     expect(screen.getByRole('button', { name: /reiniciar/i })).toBeDefined();
+  });
+});
+
+describe('ExercisePlayer keyboard shortcuts', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    mockClockMs = 0;
+    vi.stubGlobal('AudioContext', MockAudioContext);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('toggles playback with Space', () => {
+    renderPlayer();
+    press(' ');
+    expect(screen.getByRole('button', { name: 'Retomar' })).toBeDefined();
+    press(' ');
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeDefined();
+  });
+
+  it('toggles the reference sound with S', () => {
+    renderPlayer();
+    press('s');
+    expect(screen.getByRole('button', { name: 'Ativar som' })).toBeDefined();
+  });
+
+  it('toggles loop with R', () => {
+    renderPlayer();
+    const loop = screen.getByRole('checkbox', { name: 'Repetir' }) as HTMLInputElement;
+    expect(loop.checked).toBe(false);
+    press('r');
+    expect(loop.checked).toBe(true);
+  });
+
+  it('steps the speed with the horizontal arrows and stops at the limit', () => {
+    renderPlayer();
+    press('ArrowRight');
+    expect(screen.getByText('1.25x')).toBeDefined();
+    for (let i = 0; i < 10; i++) press('ArrowRight');
+    expect(screen.getByText('2.00x')).toBeDefined();
+    press('ArrowLeft');
+    expect(screen.getByText('1.75x')).toBeDefined();
+  });
+
+  it('steps the mic sensitivity with the vertical arrows and stops at the limit', () => {
+    renderPlayer();
+    press('ArrowUp');
+    expect(screen.getByText('0.20')).toBeDefined();
+    for (let i = 0; i < 10; i++) press('ArrowDown');
+    expect(screen.getByText('0.05')).toBeDefined();
+  });
+
+  it('leaves arrows to a focused slider', () => {
+    renderPlayer();
+    press('ArrowRight', screen.getByRole('slider', { name: /velocidade/i }));
+    expect(screen.getByText('1.00x')).toBeDefined();
+  });
+
+  it('still honors letter shortcuts while a button has focus', () => {
+    renderPlayer();
+    press('s', screen.getByRole('button', { name: 'Pausar' }));
+    expect(screen.getByRole('button', { name: 'Ativar som' })).toBeDefined();
+  });
+
+  it('ignores shortcuts with Ctrl held', () => {
+    renderPlayer();
+    press('s', document.body, { ctrlKey: true });
+    expect(screen.getByRole('button', { name: 'Silenciar' })).toBeDefined();
+  });
+
+  it('turns the microphone off and on with M and with the mic button', () => {
+    renderPlayer();
+    press('m');
+    expect(screen.getByRole('button', { name: 'Ligar microfone' })).toBeDefined();
+    expect(screen.getByText('Microfone desligado')).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ligar microfone' }));
+    expect(screen.getByRole('button', { name: 'Desligar microfone' })).toBeDefined();
+    expect(screen.queryByText('Microfone desligado')).toBeNull();
+  });
+
+  it('asks for the previous/next exercise with PageUp/PageDown and [ ]', () => {
+    const onPreviousExercise = vi.fn();
+    const onNextExercise = vi.fn();
+    renderPlayer({ onPreviousExercise, onNextExercise });
+    press('PageDown');
+    press(']');
+    press('PageUp');
+    press('[');
+    expect(onNextExercise).toHaveBeenCalledTimes(2);
+    expect(onPreviousExercise).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the help with ? and suspends shortcuts while it is open', () => {
+    renderPlayer();
+    press('?', document.body, { shiftKey: true });
+    expect(screen.getByRole('dialog', { name: 'Atalhos de teclado' })).toBeDefined();
+
+    press('s');
+    expect(screen.getByRole('button', { name: 'Silenciar' })).toBeDefined();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('opens the help from the keyboard button', () => {
+    renderPlayer();
+    fireEvent.click(screen.getByRole('button', { name: 'Atalhos de teclado' }));
+    expect(screen.getByRole('dialog', { name: 'Atalhos de teclado' })).toBeDefined();
   });
 });
