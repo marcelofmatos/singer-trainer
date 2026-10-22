@@ -1,0 +1,115 @@
+// frontend/src/components/InputLane.test.tsx
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { InputLane, type InputLaneProps } from './InputLane';
+import type { PitchTrackerState } from '../hooks/usePitchTracker';
+
+const trackerCalls: unknown[][] = [];
+const tracker: { state: PitchTrackerState } = {
+  state: { status: 'listening', errorMessage: null, currentNote: null, waveform: [], deviceName: 'USB', deviceId: 'usb' },
+};
+
+vi.mock('../hooks/usePitchTracker', () => ({
+  usePitchTracker: (...args: unknown[]) => {
+    trackerCalls.push(args);
+    return tracker.state;
+  },
+}));
+
+const INPUTS = [
+  { deviceId: 'usb', label: 'USB' },
+  { deviceId: 'monitor', label: 'Monitor' },
+];
+
+function renderLane(overrides: Partial<InputLaneProps> = {}) {
+  const props: InputLaneProps = {
+    lane: { id: 'primary', deviceId: 'usb' },
+    position: 1,
+    sensitivity: 0.15,
+    micEnabled: true,
+    onToggleMic: vi.fn(),
+    targetMidiNumber: 60,
+    scoringActive: true,
+    audioInputs: INPUTS,
+    onRefreshInputs: vi.fn(),
+    onSelectDevice: vi.fn(),
+    onSample: vi.fn(),
+    onNoteClick: vi.fn(),
+    ...overrides,
+  };
+  render(<InputLane {...props} />);
+  return props;
+}
+
+describe('InputLane', () => {
+  beforeEach(() => {
+    trackerCalls.length = 0;
+    tracker.state = { ...tracker.state, status: 'listening', currentNote: null, errorMessage: null, deviceId: 'usb' };
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('opens its own device, falling back to the default only on the primary lane', () => {
+    renderLane();
+    expect(trackerCalls[trackerCalls.length - 1]).toEqual([0.15, true, 'usb', { fallbackToDefault: true }]);
+    renderLane({ lane: { id: 'lane-2', deviceId: 'monitor' }, position: 2, onRemove: vi.fn() });
+    expect(trackerCalls[trackerCalls.length - 1]).toEqual([0.15, true, 'monitor', { fallbackToDefault: false }]);
+  });
+
+  it('labels the primary lane "Microfone" and others by position, with remove only on non-primary', () => {
+    renderLane();
+    expect(screen.getByRole('combobox', { name: 'Microfone' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: /remover/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Desligar microfone' })).toBeDefined();
+  });
+
+  it('removes and toggles a non-primary lane through its own buttons', () => {
+    const onRemove = vi.fn();
+    const onToggleMic = vi.fn();
+    renderLane({ lane: { id: 'lane-2', deviceId: 'monitor' }, position: 2, onRemove, onToggleMic });
+    fireEvent.click(screen.getByRole('button', { name: 'Remover entrada 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Desligar entrada 2' }));
+    expect(onRemove).toHaveBeenCalled();
+    expect(onToggleMic).toHaveBeenCalled();
+    expect(screen.getByRole('combobox', { name: 'Entrada 2' })).toBeDefined();
+  });
+
+  it('selects another device', () => {
+    const props = renderLane();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Microfone' }), { target: { value: 'monitor' } });
+    expect(props.onSelectDevice).toHaveBeenCalledWith('monitor');
+  });
+
+  it('samples hits every 100ms while active and listening with a target', () => {
+    tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 3, midiNumber: 48, cents: 0 } };
+    const props = renderLane();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(props.onSample).toHaveBeenCalledTimes(3);
+    expect(props.onSample).toHaveBeenLastCalledWith('primary', true);
+  });
+
+  it('does not sample while inactive, without a target or without listening', () => {
+    const inactive = renderLane({ scoringActive: false });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(inactive.onSample).not.toHaveBeenCalled();
+  });
+
+  it('shows "Entrada desconectada" when its device is missing', () => {
+    tracker.state = { ...tracker.state, status: 'error', errorMessage: 'Entrada desconectada', deviceId: null };
+    renderLane({ lane: { id: 'lane-2', deviceId: 'gone' }, position: 2, onRemove: vi.fn() });
+    expect(screen.getByRole('alert').textContent).toContain('Entrada desconectada');
+  });
+
+  it('shows "Mic desativado" when off', () => {
+    tracker.state = { ...tracker.state, status: 'off', deviceId: null };
+    renderLane({ micEnabled: false });
+    expect(screen.getByText('Mic desativado')).toBeDefined();
+  });
+});
