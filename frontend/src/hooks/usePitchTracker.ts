@@ -3,7 +3,7 @@ import { DEFAULT_THRESHOLD, detectPitchYIN } from '../lib/pitchDetection';
 import { frequencyToNote, type NoteInfo } from '../lib/noteUtils';
 import { downsampleWaveform } from '../lib/waveformSampling';
 
-export type PitchTrackerStatus = 'requesting' | 'listening' | 'error';
+export type PitchTrackerStatus = 'requesting' | 'listening' | 'error' | 'off';
 
 export interface PitchTrackerState {
   status: PitchTrackerStatus;
@@ -21,16 +21,20 @@ const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_P
 
 /**
  * Listens to the microphone and reports the detected note and a rolling waveform buffer
- * ~20 times/sec until unmounted.
+ * ~20 times/sec while `enabled`. Turning `enabled` off releases the stream (the browser's
+ * recording indicator goes away) and reports status 'off'; turning it back on reopens it.
  *
  * `sensitivity` is the YIN detection threshold: lower = stricter (fewer false positives
  * on noise/breath, but may miss soft/unclear pitches), higher = more lenient. It's read
  * via a ref inside the polling loop so adjusting it never re-requests microphone access
  * or tears down the existing audio graph.
  */
-export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchTrackerState {
+export function usePitchTracker(
+  sensitivity: number = DEFAULT_THRESHOLD,
+  enabled: boolean = true
+): PitchTrackerState {
   const [state, setState] = useState<PitchTrackerState>({
-    status: 'requesting',
+    status: enabled ? 'requesting' : 'off',
     errorMessage: null,
     currentNote: null,
     waveform: [],
@@ -42,6 +46,12 @@ export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchT
   }, [sensitivity]);
 
   useEffect(() => {
+    if (!enabled) {
+      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [] });
+      return;
+    }
+    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [] });
+
     let cancelled = false;
     let stream: MediaStream | null = null;
     let audioContext: AudioContext | null = null;
@@ -94,7 +104,7 @@ export function usePitchTracker(sensitivity: number = DEFAULT_THRESHOLD): PitchT
       stream?.getTracks().forEach((track) => track.stop());
       audioContext?.close();
     };
-  }, []);
+  }, [enabled]);
 
   return state;
 }
