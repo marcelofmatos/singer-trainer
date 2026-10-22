@@ -18,10 +18,16 @@ describe('resolveShortcut', () => {
     ['s', 'toggleMute'],
     ['m', 'toggleMic'],
     ['r', 'toggleLoop'],
-    ['ArrowLeft', 'slower'],
-    ['ArrowRight', 'faster'],
-    ['ArrowDown', 'lessSensitive'],
-    ['ArrowUp', 'moreSensitive'],
+    ['ArrowRight', 'nextNote'],
+    ['ArrowDown', 'nextNote'],
+    ['ArrowLeft', 'previousNote'],
+    ['ArrowUp', 'previousNote'],
+    ['Home', 'firstNote'],
+    ['-', 'slower'],
+    ['+', 'faster'],
+    ['=', 'faster'],
+    [',', 'lessSensitive'],
+    ['.', 'moreSensitive'],
     ['PageUp', 'previousExercise'],
     ['[', 'previousExercise'],
     ['PageDown', 'nextExercise'],
@@ -52,32 +58,28 @@ describe('resolveShortcut', () => {
     }
   });
 
-  it('lets a focused button keep Space but still honors arrows and letter shortcuts', () => {
-    const button = document.createElement('button');
-    expect(resolveShortcut(keyEvent(' ', { target: button }))).toBeNull();
-    expect(resolveShortcut(keyEvent('ArrowRight', { target: button }))).toBe('faster');
-    expect(resolveShortcut(keyEvent('s', { target: button }))).toBe('toggleMute');
+  it('lets a focused button or checkbox keep only Space', () => {
+    for (const target of [document.createElement('button'), input('checkbox')]) {
+      expect(resolveShortcut(keyEvent(' ', { target }))).toBeNull();
+      expect(resolveShortcut(keyEvent('ArrowRight', { target }))).toBe('nextNote');
+      expect(resolveShortcut(keyEvent('s', { target }))).toBe('toggleMute');
+    }
   });
 
-  it('treats checkboxes like buttons', () => {
-    expect(resolveShortcut(keyEvent(' ', { target: input('checkbox') }))).toBeNull();
-    expect(resolveShortcut(keyEvent('ArrowUp', { target: input('checkbox') }))).toBe('moreSensitive');
-    expect(resolveShortcut(keyEvent('r', { target: input('checkbox') }))).toBe('toggleLoop');
-  });
-
-  it('leaves Space and arrows to role="button" elements (the wheel bubbles navigate with arrows)', () => {
+  it('sends Space, arrows and Home from a focused wheel bubble to the global shortcuts', () => {
     const bubble = document.createElement('div');
     bubble.setAttribute('role', 'button');
-    expect(resolveShortcut(keyEvent(' ', { target: bubble }))).toBeNull();
-    expect(resolveShortcut(keyEvent('ArrowLeft', { target: bubble }))).toBeNull();
-    expect(resolveShortcut(keyEvent('m', { target: bubble }))).toBe('toggleMic');
+    expect(resolveShortcut(keyEvent(' ', { target: bubble }))).toBe('togglePlay');
+    expect(resolveShortcut(keyEvent('ArrowLeft', { target: bubble }))).toBe('previousNote');
+    expect(resolveShortcut(keyEvent('Home', { target: bubble }))).toBe('firstNote');
   });
 
-  it('lets a focused range slider keep arrows and PageUp/PageDown', () => {
+  it('lets a focused range slider keep arrows, PageUp/PageDown, Home and End', () => {
     const slider = input('range');
-    expect(resolveShortcut(keyEvent('ArrowUp', { target: slider }))).toBeNull();
-    expect(resolveShortcut(keyEvent('PageDown', { target: slider }))).toBeNull();
-    expect(resolveShortcut(keyEvent(']', { target: slider }))).toBe('nextExercise');
+    for (const key of ['ArrowUp', 'ArrowRight', 'PageDown', 'PageUp', 'Home', 'End']) {
+      expect(resolveShortcut(keyEvent(key, { target: slider }))).toBeNull();
+    }
+    expect(resolveShortcut(keyEvent('+', { target: slider }))).toBe('faster');
     expect(resolveShortcut(keyEvent(' ', { target: slider }))).toBe('togglePlay');
   });
 });

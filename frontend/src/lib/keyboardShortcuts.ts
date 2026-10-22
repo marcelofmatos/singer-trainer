@@ -4,6 +4,9 @@ export type ShortcutAction =
   | 'toggleMute'
   | 'toggleMic'
   | 'toggleLoop'
+  | 'nextNote'
+  | 'previousNote'
+  | 'firstNote'
   | 'slower'
   | 'faster'
   | 'lessSensitive'
@@ -26,10 +29,16 @@ const ACTIONS_BY_KEY: Record<string, ShortcutAction> = {
   s: 'toggleMute',
   m: 'toggleMic',
   r: 'toggleLoop',
-  ArrowLeft: 'slower',
-  ArrowRight: 'faster',
-  ArrowDown: 'lessSensitive',
-  ArrowUp: 'moreSensitive',
+  ArrowRight: 'nextNote',
+  ArrowDown: 'nextNote',
+  ArrowLeft: 'previousNote',
+  ArrowUp: 'previousNote',
+  Home: 'firstNote',
+  '-': 'slower',
+  '+': 'faster',
+  '=': 'faster',
+  ',': 'lessSensitive',
+  '.': 'moreSensitive',
   PageUp: 'previousExercise',
   '[': 'previousExercise',
   PageDown: 'nextExercise',
@@ -37,22 +46,22 @@ const ACTIONS_BY_KEY: Record<string, ShortcutAction> = {
   '?': 'showHelp',
 };
 
-const ARROW_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+const RANGE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
 
 /**
- * Keys the focused element already handles natively (or, for the wheel bubbles, by its own
- * handler). Only those keys are left alone — other shortcuts keep working, so a button that
- * kept focus after a mouse click doesn't swallow every shortcut.
+ * Keys the focused element already handles natively. Only those keys are left alone — other
+ * shortcuts keep working, so a button that kept focus after a mouse click doesn't swallow
+ * every shortcut. The wheel bubbles own none: arrows, Home and Space stay global, and Enter
+ * (unmapped here) is handled by the bubble itself.
  */
 function keysOwnedByFocus(target: EventTarget | null): 'all' | string[] {
   if (!(target instanceof Element)) return [];
   if (target.matches('select, textarea')) return 'all';
   if (target instanceof HTMLInputElement) {
-    if (target.type === 'range') return [...ARROW_KEYS, 'PageUp', 'PageDown'];
+    if (target.type === 'range') return RANGE_KEYS;
     if (target.type === 'checkbox') return [' '];
     return 'all';
   }
-  if (target.matches('[role="button"]')) return [' ', ...ARROW_KEYS];
   if (target.matches('button')) return [' '];
   return [];
 }
@@ -69,16 +78,18 @@ export function resolveShortcut(event: ShortcutKeyEvent): ShortcutAction | null 
 
 /** Rows of the keyboard help dialog — kept next to the key map so the two never diverge. */
 export const SHORTCUT_HELP: { keys: string; description: string }[] = [
-  { keys: 'Espaço', description: 'Tocar / pausar / reiniciar' },
+  { keys: 'Espaço', description: 'Tocar / pausar / reiniciar o exercício' },
+  { keys: '← → ↑ ↓', description: 'Navegar entre as notas da roda' },
+  { keys: 'Home', description: 'Voltar para o C' },
+  { keys: 'Enter', description: 'Tocar a nota selecionada' },
+  { keys: '- / +', description: 'Diminuir / aumentar a velocidade' },
+  { keys: ', / .', description: 'Diminuir / aumentar a sensibilidade do microfone' },
   { keys: 'S', description: 'Silenciar / ativar o som da referência' },
   { keys: 'M', description: 'Ligar / desligar o microfone' },
   { keys: 'R', description: 'Repetir o exercício' },
-  { keys: '← / →', description: 'Diminuir / aumentar a velocidade' },
-  { keys: '↓ / ↑', description: 'Diminuir / aumentar a sensibilidade do microfone' },
   { keys: 'PageUp ou [', description: 'Exercício anterior' },
   { keys: 'PageDown ou ]', description: 'Próximo exercício' },
   { keys: '?', description: 'Mostrar estes atalhos' },
-  { keys: 'Setas na roda', description: 'Navegar entre as notas (Enter toca a nota)' },
 ];
 
 /** Adds `delta` to `value`, clamped to [min, max] and rounded to 2 decimals (slider steps are 0.05/0.25). */
