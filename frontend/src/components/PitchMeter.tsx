@@ -1,5 +1,5 @@
 // frontend/src/components/PitchMeter.tsx
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   CHROMATIC_NOTE_COLORS,
   CHROMATIC_NOTE_NAMES,
@@ -38,6 +38,7 @@ const RING_RADIUS = 20;
 const RING_STROKE_WIDTH = 5;
 const TRAIL_LENGTH = 6; // ~300ms tail at TRAIL_TICK_MS
 const TRAIL_TICK_MS = 50; // matches the pitch tracker's own detection cadence
+const NOTE_COUNT = CHROMATIC_NOTE_NAMES.length;
 
 export function PitchMeter({
   detectedNote,
@@ -76,6 +77,39 @@ export function PitchMeter({
     return () => clearInterval(intervalId);
   }, []);
 
+  // Roving tabindex: the wheel is one tab stop; arrows move focus between bubbles.
+  const [focusableIndex, setFocusableIndex] = useState(0);
+  const bubbleRefs = useRef<(SVGGElement | null)[]>([]);
+
+  function moveFocus(index: number) {
+    setFocusableIndex(index);
+    bubbleRefs.current[index]?.focus();
+  }
+
+  function handleBubbleKeyDown(event: KeyboardEvent, index: number) {
+    if (!onNoteClick) return;
+    switch (event.key) {
+      case 'Enter':
+      case ' ':
+        onNoteClick(index);
+        break;
+      case 'ArrowRight':
+      case 'ArrowDown':
+        moveFocus((index + 1) % NOTE_COUNT);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        moveFocus((index + NOTE_COUNT - 1) % NOTE_COUNT);
+        break;
+      case 'Home':
+        moveFocus(0);
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+  }
+
   return (
     <svg viewBox={`0 0 ${VIEWBOX_SIZE} ${VIEWBOX_SIZE}`} width="100%" role="img" aria-label="Roda cromática de afinação">
       {CHROMATIC_NOTE_NAMES.map((name, index) => {
@@ -85,22 +119,17 @@ export function PitchMeter({
         return (
           <g
             key={name}
+            ref={(element) => {
+              bubbleRefs.current[index] = element;
+            }}
             data-testid={`note-bubble-${name}`}
             data-active={isTarget ? 'true' : 'false'}
             role={onNoteClick ? 'button' : undefined}
-            tabIndex={onNoteClick ? 0 : undefined}
+            tabIndex={onNoteClick ? (index === focusableIndex ? 0 : -1) : undefined}
             style={onNoteClick ? { cursor: 'pointer' } : undefined}
             onClick={onNoteClick ? () => onNoteClick(index) : undefined}
-            onKeyDown={
-              onNoteClick
-                ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onNoteClick(index);
-                    }
-                  }
-                : undefined
-            }
+            onFocus={onNoteClick ? () => setFocusableIndex(index) : undefined}
+            onKeyDown={onNoteClick ? (event) => handleBubbleKeyDown(event, index) : undefined}
           >
             {isTarget && (
               <>

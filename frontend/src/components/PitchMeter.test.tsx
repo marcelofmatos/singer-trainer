@@ -244,4 +244,43 @@ describe('PitchMeter', () => {
     expect(screen.queryByTestId('live-indicator')).toBeNull();
     expect(screen.queryAllByTestId('live-indicator-trail').length).toBe(0);
   });
+
+  it('exposes a single tab stop on the wheel, starting at C', () => {
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
+    );
+    const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const tabIndexes = names.map((name) => screen.getByTestId(`note-bubble-${name}`).getAttribute('tabindex'));
+    expect(tabIndexes.filter((value) => value === '0')).toHaveLength(1);
+    expect(screen.getByTestId('note-bubble-C').getAttribute('tabindex')).toBe('0');
+  });
+
+  it('moves focus around the wheel with the arrow keys, wrapping B<->C', () => {
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
+    );
+    const c = screen.getByTestId('note-bubble-C');
+    c.focus();
+
+    fireEvent.keyDown(c, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
+
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowUp' });
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-B'));
+
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(c);
+    expect(screen.getByTestId('note-bubble-B').getAttribute('tabindex')).toBe('-1');
+  });
+
+  it('jumps back to C with Home', () => {
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
+    );
+    const g = screen.getByTestId('note-bubble-G');
+    g.focus();
+    fireEvent.keyDown(g, { key: 'Home' });
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
+  });
 });
