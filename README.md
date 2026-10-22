@@ -23,6 +23,10 @@ quão perto você está da nota certa.
 - **Bolhas clicáveis** — toque em qualquer nota da roda pra ouvir como ela soa.
 - Página única com dropdown de exercícios — trocar de exercício não pede acesso ao
   microfone de novo, e a última lição escolhida fica salva entre recarregamentos.
+- **Controles pelo teclado** — Espaço (tocar/pausar), S (som), M (microfone), R
+  (repetir), ←/→ (velocidade), ↓/↑ (sensibilidade), PageUp/PageDown ou `[`/`]` (trocar
+  exercício) e `?` (lista de atalhos). A roda é um único Tab e as setas giram entre as
+  notas. O botão 🎙️ (ou M) libera o microfone de verdade.
 
 ## Rodando localmente
 
@@ -66,6 +70,41 @@ A stack de deploy (compose, variáveis de ambiente, proxy) fica fora deste repos
 num diretório de infraestrutura separado.
 
 ## Arquitetura e decisões de design
+
+### Arquitetura
+
+```mermaid
+flowchart LR
+  User["Usuário"] -->|voz| Mic["Microfone<br/>getUserMedia"]
+  User -->|teclado / mouse| UI["App + ExercisePlayer"]
+  Mic --> Tracker["usePitchTracker<br/>YIN no navegador"]
+  Tracker -->|nota + forma de onda| UI
+  UI --> Wheel["PitchMeter<br/>roda cromática"]
+  UI --> Wave["Waveform"]
+  UI --> Tone["referenceTone<br/>Web Audio"]
+  Tone -->|som de referência| User
+  UI --> Prefs["localStorage<br/>preferências e último exercício"]
+```
+
+### Fluxo de um atalho de teclado
+
+```mermaid
+sequenceDiagram
+  participant U as Usuário
+  participant D as document keydown
+  participant R as resolveShortcut
+  participant P as ExercisePlayer
+  U->>D: pressiona uma tecla
+  D->>P: handler atual via ref
+  P->>R: tecla, modificadores e alvo
+  R-->>P: ação ou nada
+  alt ação reconhecida e ajuda fechada
+    P->>P: preventDefault e atualiza o estado
+    P-->>U: UI, áudio ou microfone reagem
+  else tecla ignorada
+    P-->>U: o elemento focado trata a tecla
+  end
+```
 
 O histórico completo de especificações e planos de implementação está em
 [`docs/superpowers/specs/`](docs/superpowers/specs/) e
