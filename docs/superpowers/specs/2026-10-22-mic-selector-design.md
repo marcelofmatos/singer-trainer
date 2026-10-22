@@ -22,7 +22,7 @@ Decisões validadas:
 
 | Situação                                    | O que aparece                                        |
 | ------------------------------------------- | ---------------------------------------------------- |
-| Pedindo acesso                              | "Pedindo acesso ao microfone…" (como hoje)          |
+| Pedindo acesso                              | "Pedindo acesso ao microfone…" + dropdown (se a lista já existe, para não perder o foco ao trocar de mic) |
 | Ouvindo, lista de microfones disponível     | 🎙️ + dropdown "Microfone" com o dispositivo em uso   |
 | Ouvindo, lista vazia (navegador sem suporte) | "🎙️ <nome>" ou "🎙️ Microfone ativo" (como hoje)      |
 | Erro, lista disponível                      | mensagem de erro + dropdown (para tentar outro mic)  |
