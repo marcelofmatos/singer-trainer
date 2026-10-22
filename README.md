@@ -27,8 +27,10 @@ quão perto você está da nota certa.
   Home volta ao C), Espaço toca/pausa o exercício, `-`/`+` mudam a velocidade, `,`/`.` a
   sensibilidade do microfone, S/M/R alternam som, microfone e repetição,
   PageUp/PageDown ou `[`/`]` trocam o exercício e `?` mostra a lista de atalhos.
-- **Microfone visível** — a linha de status mostra o nome do microfone em uso (ou "Mic
-  desativado"); o botão 🎙️ (ou M) libera o microfone de verdade.
+- **Seletor de microfone** — dropdown com os microfones do sistema no lugar do nome do
+  mic; a escolha fica salva, a lista se atualiza ao conectar/desconectar (ou no botão 🔄)
+  e, se o mic escolhido sumir, o app volta para o padrão do sistema. Com o mic desligado
+  (botão 🎙️ ou M) aparece "Mic desativado".
 
 ## Rodando localmente
 
@@ -77,7 +79,7 @@ num diretório de infraestrutura separado.
 
 ```mermaid
 flowchart LR
-  User["Usuário"] -->|voz| Mic["Microfone<br/>getUserMedia"]
+  User["Usuário"] -->|voz| Mic["Microfone<br/>getUserMedia / enumerateDevices"]
   User -->|teclado / mouse| UI["App + ExercisePlayer"]
   Mic --> Tracker["usePitchTracker<br/>YIN no navegador"]
   Tracker -->|nota + forma de onda| UI

@@ -315,3 +315,92 @@ describe('ExercisePlayer keyboard shortcuts', () => {
     expect(screen.getByRole('dialog', { name: 'Atalhos de teclado' })).toBeDefined();
   });
 });
+
+describe('ExercisePlayer microphone picker', () => {
+  let devices: Array<{ deviceId: string; label: string; kind: string }>;
+  let getUserMedia: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    mockClockMs = 0;
+    vi.stubGlobal('AudioContext', MockAudioContext);
+    vi.useFakeTimers();
+    devices = [
+      { deviceId: 'default', label: 'Padrão', kind: 'audioinput' },
+      { deviceId: 'usb', label: 'USB Mic', kind: 'audioinput' },
+    ];
+    getUserMedia = vi.fn(async (constraints: { audio: true | { deviceId: { exact: string } } }) => {
+      const deviceId = constraints.audio === true ? 'default' : constraints.audio.deviceId.exact;
+      const track = {
+        stop: vi.fn(),
+        label: devices.find((device) => device.deviceId === deviceId)?.label ?? '',
+        getSettings: () => ({ deviceId }),
+        addEventListener: () => {},
+      };
+      return { getTracks: () => [track], getAudioTracks: () => [track] };
+    });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        getUserMedia,
+        enumerateDevices: vi.fn(async () => devices.map((device) => ({ ...device }))),
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      },
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    Object.defineProperty(navigator, 'mediaDevices', { value: undefined, configurable: true });
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  async function flush() {
+    await act(async () => {});
+    await act(async () => {});
+  }
+
+  it('lists the microphones with the one in use selected', async () => {
+    renderPlayer();
+    await flush();
+    const select = screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['Padrão', 'USB Mic']);
+    expect(select.value).toBe('default');
+  });
+
+  it('switches to the chosen microphone and remembers it', async () => {
+    renderPlayer();
+    await flush();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Microfone' }), { target: { value: 'usb' } });
+    await flush();
+    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+    expect(localStorage.getItem('singer-trainer:mic-device-id')).toBe('usb');
+    expect((screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement).value).toBe('usb');
+  });
+
+  it('opens the remembered microphone on start', async () => {
+    localStorage.setItem('singer-trainer:mic-device-id', 'usb');
+    renderPlayer();
+    await flush();
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+  });
+
+  it('shows a newly enabled microphone after pressing the refresh button', async () => {
+    renderPlayer();
+    await flush();
+    devices.push({ deviceId: 'headset', label: 'Headset', kind: 'audioinput' });
+    fireEvent.click(screen.getByRole('button', { name: 'Atualizar lista de microfones' }));
+    await flush();
+    expect(screen.getByRole('option', { name: 'Headset' })).toBeDefined();
+  });
+
+  it('replaces the picker with "Mic desativado" when the microphone is off', async () => {
+    renderPlayer();
+    await flush();
+    press('m');
+    await flush();
+    expect(screen.queryByRole('combobox', { name: 'Microfone' })).toBeNull();
+    expect(screen.getByText('Mic desativado')).toBeDefined();
+  });
+});

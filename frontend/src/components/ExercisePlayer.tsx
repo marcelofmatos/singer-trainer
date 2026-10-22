@@ -6,6 +6,8 @@ import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbac
 import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
+import { loadMicDeviceId, saveMicDeviceId } from '../lib/micPreference';
+import { useAudioInputs } from '../hooks/useAudioInputs';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
 import { KeyboardHelp } from './KeyboardHelp';
 import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
@@ -50,7 +52,9 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   const [helpOpen, setHelpOpen] = useState(false);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
-  const pitchTracker = usePitchTracker(micSensitivity, micEnabled);
+  const [preferredMicId, setPreferredMicId] = useState(() => loadMicDeviceId());
+  const pitchTracker = usePitchTracker(micSensitivity, micEnabled, preferredMicId);
+  const audioInputs = useAudioInputs(pitchTracker.deviceId);
 
   // Read via refs inside the effect below so toggling these controls mid-playback
   // doesn't restart the currently-playing cycle from scratch.
@@ -152,6 +156,14 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
     }
   }
 
+  function selectMic(deviceId: string) {
+    setPreferredMicId(deviceId);
+    saveMicDeviceId(deviceId);
+  }
+
+  const showMicPicker =
+    audioInputs.inputs.length > 0 && (pitchTracker.status === 'listening' || pitchTracker.status === 'error');
+
   function handleNoteClick(pitchClass: number) {
     if (muted) return;
     try {
@@ -244,8 +256,34 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
             Erro ao acessar o microfone: {pitchTracker.errorMessage}
           </p>
         )}
-        {pitchTracker.status === 'listening' && (
-          <p className="status-message">🎙️ {pitchTracker.deviceName ?? 'Microfone ativo'}</p>
+        {showMicPicker ? (
+          <div className="mic-picker">
+            <span aria-hidden="true">🎙️</span>
+            <select
+              className="mic-select"
+              aria-label="Microfone"
+              value={pitchTracker.deviceId ?? preferredMicId ?? ''}
+              onChange={(event) => selectMic(event.target.value)}
+            >
+              {audioInputs.inputs.map((input) => (
+                <option key={input.deviceId} value={input.deviceId}>
+                  {input.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={audioInputs.refresh}
+              aria-label="Atualizar lista de microfones"
+            >
+              🔄
+            </button>
+          </div>
+        ) : (
+          pitchTracker.status === 'listening' && (
+            <p className="status-message">🎙️ {pitchTracker.deviceName ?? 'Microfone ativo'}</p>
+          )
         )}
         {pitchTracker.status === 'off' && <p className="status-message">Mic desativado</p>}
         {toneError && (
