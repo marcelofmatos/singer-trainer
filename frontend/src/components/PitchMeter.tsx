@@ -43,6 +43,7 @@ const CENTER = { x: VIEWBOX_SIZE / 2, y: VIEWBOX_SIZE / 2 };
 const WHEEL_RADIUS = 90;
 const BUBBLE_RADIUS = 22;
 const RING_RADIUS = 20;
+const FOCUS_RING_RADIUS = BUBBLE_RADIUS + 9; // outside the target's white/black ring (BUBBLE_RADIUS + 6)
 const RING_STROKE_WIDTH = 5;
 const TRAIL_LENGTH = 6; // ~300ms tail at TRAIL_TICK_MS
 const TRAIL_TICK_MS = 50; // matches the pitch tracker's own detection cadence
@@ -141,6 +142,16 @@ export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function
                 <circle cx={x} cy={y} r={BUBBLE_RADIUS + 6} fill="none" stroke="#ffffff" strokeWidth={2} />
                 <circle cx={x} cy={y} r={BUBBLE_RADIUS + 4} fill="none" stroke="#000000" strokeWidth={2} />
               </>
+            )}
+            {onNoteClick && (
+              <circle
+                className="bubble-focus-ring"
+                cx={x}
+                cy={y}
+                r={FOCUS_RING_RADIUS}
+                fill="none"
+                strokeWidth={3}
+              />
             )}
             <circle cx={x} cy={y} r={BUBBLE_RADIUS} fill={color} />
             <text

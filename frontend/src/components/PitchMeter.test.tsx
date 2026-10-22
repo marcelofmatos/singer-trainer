@@ -246,6 +246,20 @@ describe('PitchMeter', () => {
     expect(screen.queryAllByTestId('live-indicator-trail').length).toBe(0);
   });
 
+  it('draws a round focus ring around each clickable bubble', () => {
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
+    );
+    const ring = screen.getByTestId('note-bubble-A').querySelector('circle.bubble-focus-ring');
+    expect(ring).not.toBeNull();
+    expect(ring!.getAttribute('fill')).toBe('none');
+  });
+
+  it('draws no focus ring when the bubbles are not clickable', () => {
+    render(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    expect(screen.getByTestId('note-bubble-A').querySelector('circle.bubble-focus-ring')).toBeNull();
+  });
+
   it('exposes a single tab stop on the wheel, starting at C', () => {
     render(
       <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
