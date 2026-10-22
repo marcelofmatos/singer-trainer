@@ -35,9 +35,13 @@ Letras valem em minúscula e maiúscula (Caps Lock ligado não quebra os atalhos
 
 ### Quando os atalhos globais NÃO disparam
 
-- Foco num elemento que já trata essas teclas: `button`, `input`, `select`, `textarea`,
-  ou qualquer elemento com `role="button"` (inclui as notas da roda). Ex.: Espaço num
-  botão focado só clica o botão; setas num slider focado só mexem nele.
+- Foco num elemento que já usa aquela tecla — só essa tecla é ignorada, as demais
+  continuam valendo (senão, depois de clicar um botão com o mouse, o foco fica nele e
+  nenhum atalho funcionaria):
+  - `select`, `textarea` e `input` de texto: ignora todas as teclas (digitação/typeahead).
+  - `button`, `input[type=checkbox]` e `role="button"` (inclui as notas da roda): ignora
+    Espaço (o próprio elemento é acionado) e as setas (navegação da roda).
+  - `input[type=range]`: ignora setas, PageUp e PageDown (o slider se move).
 - Com Ctrl, Alt ou Meta pressionados (não roubar atalhos do navegador/SO). Shift é
   permitido (necessário para `?`).
 - Com o painel de ajuda aberto.
@@ -111,8 +115,8 @@ painel de ajuda, para a tabela não divergir do mapa.
 ## Testes
 
 - `keyboardShortcuts.test.ts`: cada tecla → ação; maiúsculas; Ctrl/Alt/Meta → `null`;
-  alvos `button`/`input`/`select`/`textarea`/`role="button"` → `null`; tecla não
-  mapeada → `null`.
+  as regras de foco por tipo de elemento (ex.: Espaço num botão → `null`, mas S num
+  botão → `toggleMute`; seta num slider → `null`); tecla não mapeada → `null`.
 - `ExercisePlayer.test.tsx`: Espaço pausa/retoma; S alterna o mudo; R alterna o loop;
   setas mudam velocidade/sensibilidade e param no limite; M desliga o mic (tracks do
   mock de `getUserMedia` paradas, status "Microfone desligado") e religa (novo
