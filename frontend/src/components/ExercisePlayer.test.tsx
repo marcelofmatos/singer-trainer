@@ -379,6 +379,19 @@ describe('ExercisePlayer microphone picker', () => {
     expect((screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement).value).toBe('usb');
   });
 
+  it('keeps the picker mounted and focused while the microphone reopens', async () => {
+    renderPlayer();
+    await flush();
+    const select = screen.getByRole('combobox', { name: 'Microfone' });
+    select.focus();
+    fireEvent.change(select, { target: { value: 'usb' } });
+    expect(screen.getByRole('combobox', { name: 'Microfone' })).toBe(select);
+    expect(document.activeElement).toBe(select);
+    await flush();
+    expect(screen.getByRole('combobox', { name: 'Microfone' })).toBe(select);
+    expect(document.activeElement).toBe(select);
+  });
+
   it('opens the remembered microphone on start', async () => {
     localStorage.setItem('singer-trainer:mic-device-id', 'usb');
     renderPlayer();

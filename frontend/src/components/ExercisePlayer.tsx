@@ -161,8 +161,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
     saveMicDeviceId(deviceId);
   }
 
-  const showMicPicker =
-    audioInputs.inputs.length > 0 && (pitchTracker.status === 'listening' || pitchTracker.status === 'error');
+  const showMicPicker = audioInputs.inputs.length > 0 && pitchTracker.status !== 'off';
 
   function handleNoteClick(pitchClass: number) {
     if (muted) return;
