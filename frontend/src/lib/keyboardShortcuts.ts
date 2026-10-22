@@ -13,7 +13,8 @@ export type ShortcutAction =
   | 'moreSensitive'
   | 'previousExercise'
   | 'nextExercise'
-  | 'showHelp';
+  | 'showHelp'
+  | 'showHistory';
 
 /** The subset of a KeyboardEvent that resolveShortcut needs (keeps it testable without real events). */
 export interface ShortcutKeyEvent {
@@ -44,6 +45,7 @@ const ACTIONS_BY_KEY: Record<string, ShortcutAction> = {
   PageDown: 'nextExercise',
   ']': 'nextExercise',
   '?': 'showHelp',
+  h: 'showHistory',
 };
 
 const RANGE_KEYS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
@@ -90,6 +92,7 @@ export const SHORTCUT_HELP: { keys: string; description: string }[] = [
   { keys: 'PageUp ou [', description: 'Exercício anterior' },
   { keys: 'PageDown ou ]', description: 'Próximo exercício' },
   { keys: '?', description: 'Mostrar estes atalhos' },
+  { keys: 'H', description: 'Abrir o histórico de pontuação' },
 ];
 
 /** Adds `delta` to `value`, clamped to [min, max] and rounded to 2 decimals (slider steps are 0.05/0.25). */

@@ -27,6 +27,10 @@ quão perto você está da nota certa.
   Home volta ao C), Espaço toca/pausa o exercício, `-`/`+` mudam a velocidade, `,`/`.` a
   sensibilidade do microfone, S/M/R alternam som, microfone e repetição,
   PageUp/PageDown ou `[`/`]` trocam o exercício e `?` mostra a lista de atalhos.
+- **Pontuação e histórico** — placar no canto superior direito com o tempo afinado (±10
+  cents da nota-alvo, em qualquer oitava) e a % de acerto da sessão e geral; cada passada
+  completa é gravada no navegador, e o painel de histórico (clique no placar ou H) mostra
+  os recordes por exercício e as últimas passadas.
 - **Seletor de microfone** — dropdown com os microfones do sistema no lugar do nome do
   mic; a escolha fica salva, a lista se atualiza ao conectar/desconectar (ou no botão 🔄)
   e, se o mic escolhido sumir, o app volta para o padrão do sistema. Com o mic desligado
@@ -87,7 +91,7 @@ flowchart LR
   UI --> Wave["Waveform"]
   UI --> Tone["referenceTone<br/>Web Audio"]
   Tone -->|som de referência| User
-  UI --> Prefs["localStorage<br/>preferências e último exercício"]
+  UI --> Prefs["localStorage<br/>preferências, último exercício e histórico de pontuação"]
 ```
 
 ### Fluxo de um atalho de teclado

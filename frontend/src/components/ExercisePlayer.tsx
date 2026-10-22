@@ -9,8 +9,13 @@ import { usePitchTracker } from '../hooks/usePitchTracker';
 import { loadMicDeviceId, saveMicDeviceId } from '../lib/micPreference';
 import { useAudioInputs } from '../hooks/useAudioInputs';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
+import { addSample, addTallies, EMPTY_TALLY, isHit, type ScoreTally } from '../lib/scoring';
+import { appendScoreRecord, loadScoreHistory, totalTally } from '../lib/scoreHistory';
+import type { NoteInfo } from '../lib/noteUtils';
 import { KeyboardHelp } from './KeyboardHelp';
 import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
+import { ScoreBoard } from './ScoreBoard';
+import { ScoreHistory } from './ScoreHistory';
 import { Waveform } from './Waveform';
 
 export interface ExercisePlayerProps {
@@ -37,6 +42,7 @@ const REPEATABLE_ACTIONS: ShortcutAction[] = [
 // The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
+const SCORE_TICK_MS = 100;
 
 export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
@@ -50,6 +56,11 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   const [muted, setMuted] = useState(false);
   const [micEnabled, setMicEnabled] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [passTally, setPassTally] = useState<ScoreTally>(EMPTY_TALLY);
+  const [sessionTally, setSessionTally] = useState<ScoreTally>(EMPTY_TALLY);
+  const [history, setHistory] = useState(() => loadScoreHistory());
+  const historyTally = useMemo(() => totalTally(history), [history]);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
   const [preferredMicId, setPreferredMicId] = useState(() => loadMicDeviceId());
@@ -63,6 +74,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
     loopRef.current = loop;
   }, [loop]);
 
+  const completePassRef = useRef(() => {});
   const audioContextRef = useRef<AudioContext | null>(null);
   const playingRef = useRef(playing);
   useEffect(() => {
@@ -115,6 +127,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       setToneError(null);
       setElapsed(0);
       setEnded(false);
+      setPassTally(EMPTY_TALLY);
 
       pollTimer = setInterval(() => {
         if (!audioContext) return;
@@ -122,6 +135,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         setElapsed(currentTime);
         if (!hasEnded && currentTime >= exerciseDuration(scaledExercise)) {
           hasEnded = true;
+          completePassRef.current();
           if (loopRef.current) {
             setCycle((c) => c + 1);
           } else {
@@ -146,6 +160,49 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   }, [scaledExercise, cycle]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
+
+  // Scoring samples on its own 100ms tick from refs, so it reads the latest pitch and target
+  // without re-arming the interval on every detection update.
+  const scoringRef = useRef<{ active: boolean; targetMidi: number | null; detected: NoteInfo | null }>({
+    active: false,
+    targetMidi: null,
+    detected: null,
+  });
+  useEffect(() => {
+    scoringRef.current = {
+      active: playing && !ended && pitchTracker.status === 'listening',
+      targetMidi: targetNote?.midiNumber ?? null,
+      detected: pitchTracker.currentNote,
+    };
+  });
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const { active, targetMidi, detected } = scoringRef.current;
+      if (!active || targetMidi === null) return;
+      setPassTally((tally) => addSample(tally, SCORE_TICK_MS / 1000, isHit(detected, targetMidi)));
+    }, SCORE_TICK_MS);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Called by the playback poll when a pass reaches its end: the pass moves into the session
+  // and the stored history (and leaves the live pass tally, so nothing is counted twice).
+  useEffect(() => {
+    completePassRef.current = () => {
+      if (passTally.targetSeconds === 0) return;
+      setHistory(
+        appendScoreRecord({
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+          finishedAt: Date.now(),
+          playbackRate,
+          ...passTally,
+        })
+      );
+      setSessionTally((tally) => addTallies(tally, passTally));
+      setPassTally(EMPTY_TALLY);
+    };
+  });
 
   function togglePlaying() {
     if (ended) {
@@ -182,7 +239,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   const handleKeyDownRef = useRef<(event: KeyboardEvent) => void>(() => {});
   useEffect(() => {
     handleKeyDownRef.current = (event) => {
-      if (helpOpen) return;
+      if (helpOpen || historyOpen) return;
       const action = resolveShortcut(event);
       if (!action) return;
       event.preventDefault();
@@ -231,6 +288,9 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         case 'showHelp':
           setHelpOpen(true);
           break;
+        case 'showHistory':
+          setHistoryOpen(true);
+          break;
       }
     };
   });
@@ -243,6 +303,11 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
 
   return (
     <section className="exercise-panel">
+      <ScoreBoard
+        session={addTallies(sessionTally, passTally)}
+        overall={addTallies(historyTally, passTally)}
+        onOpenHistory={() => setHistoryOpen(true)}
+      />
       <div className="exercise-info">
         <h2 className="exercise-title">{exercise.name}</h2>
         <p className="exercise-description">{exercise.description}</p>
@@ -388,6 +453,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         </button>
       </div>
       <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      <ScoreHistory open={historyOpen} onClose={() => setHistoryOpen(false)} history={history} />
     </section>
   );
 }

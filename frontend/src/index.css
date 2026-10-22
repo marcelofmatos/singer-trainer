@@ -25,6 +25,7 @@ body {
 }
 
 .app {
+  position: relative;
   max-width: 880px;
   margin: 0 auto;
   padding: 3rem 1.5rem 4rem;
@@ -281,7 +282,8 @@ body {
   border-color: var(--color-danger);
 }
 
-.keyboard-help {
+.keyboard-help,
+.app-dialog {
   max-width: min(440px, calc(100vw - 2rem));
   padding: 1.5rem;
   border: 1px solid var(--color-border);
@@ -291,11 +293,13 @@ body {
   font-family: var(--font-body);
 }
 
-.keyboard-help::backdrop {
+.keyboard-help::backdrop,
+.app-dialog::backdrop {
   background: rgba(0, 0, 0, 0.6);
 }
 
-.keyboard-help-title {
+.keyboard-help-title,
+.app-dialog-title {
   font-family: var(--font-display);
   font-size: 1.25rem;
   font-weight: 600;
@@ -334,7 +338,8 @@ body {
   background: var(--color-bg);
 }
 
-.keyboard-help-close {
+.keyboard-help-close,
+.app-dialog-close {
   margin-top: 1.25rem;
   font-family: var(--font-body);
   font-weight: 600;
@@ -347,8 +352,98 @@ body {
 }
 
 .keyboard-help-close:hover,
-.keyboard-help-close:focus-visible {
+.keyboard-help-close:focus-visible,
+.app-dialog-close:hover,
+.app-dialog-close:focus-visible {
   border-color: var(--color-accent);
+}
+
+.app-dialog {
+  max-width: min(560px, calc(100vw - 2rem));
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.score-board {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.score-board:hover,
+.score-board:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.score-board-grid {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  column-gap: 0.9rem;
+  row-gap: 0.15rem;
+  align-items: baseline;
+  text-align: right;
+}
+
+.score-board-heading,
+.score-board-label {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.score-board-label {
+  text-align: left;
+}
+
+.score-board strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.score-history-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.score-history-table caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+.score-history-table th,
+.score-history-table td {
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  text-align: left;
+  font-weight: 400;
+}
+
+.score-history-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-history-empty {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 899px) {
+  .score-board {
+    position: static;
+    margin: 0 auto 1rem;
+  }
 }
 
 @media (min-width: 900px) {

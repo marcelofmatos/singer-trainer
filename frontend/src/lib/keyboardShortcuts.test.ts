@@ -33,6 +33,7 @@ describe('resolveShortcut', () => {
     ['PageDown', 'nextExercise'],
     [']', 'nextExercise'],
     ['?', 'showHelp'],
+    ['h', 'showHistory'],
   ])('maps %j to %s', (key, action) => {
     expect(resolveShortcut(keyEvent(key))).toBe(action);
   });
