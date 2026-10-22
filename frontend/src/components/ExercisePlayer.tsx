@@ -152,39 +152,43 @@ export function ExercisePlayer({ exercise }: ExercisePlayerProps) {
 
   return (
     <section className="exercise-panel">
-      <h2 className="exercise-title">{exercise.name}</h2>
-      <p className="exercise-description">{exercise.description}</p>
+      <div className="exercise-info">
+        <h2 className="exercise-title">{exercise.name}</h2>
+        <p className="exercise-description">{exercise.description}</p>
 
-      {pitchTracker.status === 'requesting' && (
-        <p className="status-message">Pedindo acesso ao microfone…</p>
-      )}
-      {pitchTracker.status === 'error' && (
-        <p className="status-message" role="alert">
-          Erro ao acessar o microfone: {pitchTracker.errorMessage}
-        </p>
-      )}
-      {toneError && (
-        <p className="status-message" role="alert">
-          Erro ao tocar o áudio de referência: {toneError}
-        </p>
-      )}
-
-      <div className="wheel-stage">
-        <PitchMeter
-          detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
-          targetMidiNumber={targetNote?.midiNumber ?? null}
-          micDisconnected={pitchTracker.status === 'error'}
-          onNoteClick={handleNoteClick}
-        />
+        {pitchTracker.status === 'requesting' && (
+          <p className="status-message">Pedindo acesso ao microfone…</p>
+        )}
+        {pitchTracker.status === 'error' && (
+          <p className="status-message" role="alert">
+            Erro ao acessar o microfone: {pitchTracker.errorMessage}
+          </p>
+        )}
+        {toneError && (
+          <p className="status-message" role="alert">
+            Erro ao tocar o áudio de referência: {toneError}
+          </p>
+        )}
       </div>
 
-      <div className="waveform-stage">
-        <Waveform
-          samples={pitchTracker.waveform}
-          detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
-          targetMidiNumber={targetNote?.midiNumber ?? null}
-          micDisconnected={pitchTracker.status === 'error'}
-        />
+      <div className="exercise-stage">
+        <div className="wheel-stage">
+          <PitchMeter
+            detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
+            targetMidiNumber={targetNote?.midiNumber ?? null}
+            micDisconnected={pitchTracker.status === 'error'}
+            onNoteClick={handleNoteClick}
+          />
+        </div>
+
+        <div className="waveform-stage">
+          <Waveform
+            samples={pitchTracker.waveform}
+            detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
+            targetMidiNumber={targetNote?.midiNumber ?? null}
+            micDisconnected={pitchTracker.status === 'error'}
+          />
+        </div>
       </div>
 
       <div className="exercise-controls">
