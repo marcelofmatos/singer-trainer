@@ -5,6 +5,7 @@ import { usePitchTracker } from './usePitchTracker';
 
 let stopSpies: ReturnType<typeof vi.fn>[] = [];
 let getUserMedia: ReturnType<typeof vi.fn>;
+let trackLabel = 'USB Audio Device';
 
 class MockAudioContext {
   sampleRate = 44100;
@@ -22,10 +23,12 @@ class MockAudioContext {
 describe('usePitchTracker', () => {
   beforeEach(() => {
     stopSpies = [];
+    trackLabel = 'USB Audio Device';
     getUserMedia = vi.fn(async () => {
       const stop = vi.fn();
       stopSpies.push(stop);
-      return { getTracks: () => [{ stop }] };
+      const track = { stop, label: trackLabel };
+      return { getTracks: () => [track], getAudioTracks: () => [track] };
     });
     vi.stubGlobal('AudioContext', MockAudioContext);
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -65,5 +68,27 @@ describe('usePitchTracker', () => {
     rerender({ enabled: true });
     await waitFor(() => expect(result.current.status).toBe('listening'));
     expect(getUserMedia).toHaveBeenCalledTimes(2);
+  });
+
+  it('reports the active microphone name while listening', async () => {
+    const { result } = renderHook(() => usePitchTracker(0.15, true));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(result.current.deviceName).toBe('USB Audio Device');
+  });
+
+  it('reports no microphone name when the browser hides the label', async () => {
+    trackLabel = '';
+    const { result } = renderHook(() => usePitchTracker(0.15, true));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(result.current.deviceName).toBeNull();
+  });
+
+  it('clears the microphone name when turned off', async () => {
+    const { result, rerender } = renderHook(({ enabled }) => usePitchTracker(0.15, enabled), {
+      initialProps: { enabled: true },
+    });
+    await waitFor(() => expect(result.current.deviceName).toBe('USB Audio Device'));
+    rerender({ enabled: false });
+    expect(result.current.deviceName).toBeNull();
   });
 });

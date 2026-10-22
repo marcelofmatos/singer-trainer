@@ -11,6 +11,8 @@ export interface PitchTrackerState {
   currentNote: NoteInfo | null;
   /** Rolling window of downsampled signed amplitude values, oldest first, range [-1, 1]. */
   waveform: number[];
+  /** Label of the active microphone while listening; null when unknown, off or failed. */
+  deviceName: string | null;
 }
 
 const BUFFER_SIZE = 4096;
@@ -38,6 +40,7 @@ export function usePitchTracker(
     errorMessage: null,
     currentNote: null,
     waveform: [],
+    deviceName: null,
   });
 
   const sensitivityRef = useRef(sensitivity);
@@ -47,10 +50,10 @@ export function usePitchTracker(
 
   useEffect(() => {
     if (!enabled) {
-      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [] });
+      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [], deviceName: null });
       return;
     }
-    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [] });
+    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [], deviceName: null });
 
     let cancelled = false;
     let stream: MediaStream | null = null;
@@ -72,7 +75,8 @@ export function usePitchTracker(
         source.connect(analyser);
 
         const buffer = new Float32Array(analyser.fftSize);
-        setState((prev) => ({ ...prev, status: 'listening' }));
+        const deviceName = stream.getAudioTracks()[0]?.label || null;
+        setState((prev) => ({ ...prev, status: 'listening', deviceName }));
 
         intervalId = setInterval(() => {
           analyser.getFloatTimeDomainData(buffer);
@@ -91,6 +95,7 @@ export function usePitchTracker(
               err instanceof Error ? err.message : 'Não foi possível acessar o microfone.',
             currentNote: null,
             waveform: [],
+            deviceName: null,
           });
         }
       }
