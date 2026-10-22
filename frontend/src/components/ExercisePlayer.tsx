@@ -6,7 +6,7 @@ import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbac
 import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
-import { resolveShortcut, stepWithin } from '../lib/keyboardShortcuts';
+import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
 import { KeyboardHelp } from './KeyboardHelp';
 import { PitchMeter } from './PitchMeter';
 import { Waveform } from './Waveform';
@@ -24,6 +24,8 @@ const MIN_SENSITIVITY = 0.05;
 const MAX_SENSITIVITY = 0.35;
 const SENSITIVITY_STEP = 0.05;
 // The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
+// Only stepping actions make sense while a key is held; toggles would flicker.
+const REPEATABLE_ACTIONS: ShortcutAction[] = ['slower', 'faster', 'lessSensitive', 'moreSensitive'];
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 
@@ -165,6 +167,8 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       const action = resolveShortcut(event);
       if (!action) return;
       event.preventDefault();
+      // Held keys auto-repeat; ignore it for toggles (still prevented so Space doesn't scroll/click).
+      if (event.repeat && !REPEATABLE_ACTIONS.includes(action)) return;
       switch (action) {
         case 'togglePlay':
           togglePlaying();

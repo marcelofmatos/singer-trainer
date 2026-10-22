@@ -231,6 +231,23 @@ describe('ExercisePlayer keyboard shortcuts', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Fechar' }));
     expect(screen.queryByRole('dialog')).toBeNull();
+
+    press('s');
+    expect(screen.getByRole('button', { name: 'Ativar som' })).toBeDefined();
+  });
+
+  it('ignores auto-repeat for toggle shortcuts', () => {
+    renderPlayer();
+    press(' ', document.body, { repeat: true });
+    expect(screen.getByRole('button', { name: 'Pausar' })).toBeDefined();
+    press('m', document.body, { repeat: true });
+    expect(screen.getByRole('button', { name: 'Desligar microfone' })).toBeDefined();
+  });
+
+  it('keeps stepping on auto-repeat', () => {
+    renderPlayer();
+    press('ArrowRight', document.body, { repeat: true });
+    expect(screen.getByText('1.25x')).toBeDefined();
   });
 
   it('opens the help from the keyboard button', () => {
