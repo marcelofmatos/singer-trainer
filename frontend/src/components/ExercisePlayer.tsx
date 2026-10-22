@@ -8,7 +8,7 @@ import { playPreviewTone } from '../audio/previewTone';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
 import { KeyboardHelp } from './KeyboardHelp';
-import { PitchMeter } from './PitchMeter';
+import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
 import { Waveform } from './Waveform';
 
 export interface ExercisePlayerProps {
@@ -23,8 +23,15 @@ const PLAYBACK_RATE_STEP = 0.25;
 const MIN_SENSITIVITY = 0.05;
 const MAX_SENSITIVITY = 0.35;
 const SENSITIVITY_STEP = 0.05;
-// Only stepping actions make sense while a key is held; toggles would flicker.
-const REPEATABLE_ACTIONS: ShortcutAction[] = ['slower', 'faster', 'lessSensitive', 'moreSensitive'];
+// Only navigation and stepping make sense while a key is held; toggles would flicker.
+const REPEATABLE_ACTIONS: ShortcutAction[] = [
+  'nextNote',
+  'previousNote',
+  'slower',
+  'faster',
+  'lessSensitive',
+  'moreSensitive',
+];
 // The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
@@ -67,6 +74,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
 
   const gainRef = useRef<GainNode | null>(null);
   const mutedRef = useRef(muted);
+  const wheelRef = useRef<PitchMeterHandle>(null);
   useEffect(() => {
     mutedRef.current = muted;
     const gain = gainRef.current;
@@ -182,6 +190,15 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         case 'toggleLoop':
           setLoop((l) => !l);
           break;
+        case 'nextNote':
+          wheelRef.current?.navigate('next');
+          break;
+        case 'previousNote':
+          wheelRef.current?.navigate('previous');
+          break;
+        case 'firstNote':
+          wheelRef.current?.navigate('first');
+          break;
         case 'slower':
           setPlaybackRate((r) => stepWithin(r, -PLAYBACK_RATE_STEP, MIN_PLAYBACK_RATE, MAX_PLAYBACK_RATE));
           break;
@@ -227,7 +244,10 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
             Erro ao acessar o microfone: {pitchTracker.errorMessage}
           </p>
         )}
-        {pitchTracker.status === 'off' && <p className="status-message">Microfone desligado</p>}
+        {pitchTracker.status === 'listening' && (
+          <p className="status-message">🎙️ {pitchTracker.deviceName ?? 'Microfone ativo'}</p>
+        )}
+        {pitchTracker.status === 'off' && <p className="status-message">Mic desativado</p>}
         {toneError && (
           <p className="status-message" role="alert">
             Erro ao tocar o áudio de referência: {toneError}
@@ -238,6 +258,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       <div className="exercise-stage">
         <div className="wheel-stage">
           <PitchMeter
+            ref={wheelRef}
             detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
             targetMidiNumber={targetNote?.midiNumber ?? null}
             micDisconnected={pitchTracker.status === 'error'}

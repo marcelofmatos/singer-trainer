@@ -53,6 +53,16 @@ class MockAudioContext {
     return new MockGainNode();
   }
 
+  sampleRate = 44100;
+
+  createMediaStreamSource() {
+    return { connect() {} };
+  }
+
+  createAnalyser() {
+    return { fftSize: 0, getFloatTimeDomainData() {} };
+  }
+
   resume() {
     return Promise.resolve();
   }
@@ -162,28 +172,30 @@ describe('ExercisePlayer keyboard shortcuts', () => {
     expect(loop.checked).toBe(true);
   });
 
-  it('steps the speed with the horizontal arrows and stops at the limit', () => {
+  it('steps the speed with - and + (or =) and stops at the limit', () => {
     renderPlayer();
-    press('ArrowRight');
+    press('+');
     expect(screen.getByText('1.25x')).toBeDefined();
-    for (let i = 0; i < 10; i++) press('ArrowRight');
+    for (let i = 0; i < 10; i++) press('=');
     expect(screen.getByText('2.00x')).toBeDefined();
-    press('ArrowLeft');
+    press('-');
     expect(screen.getByText('1.75x')).toBeDefined();
   });
 
-  it('steps the mic sensitivity with the vertical arrows and stops at the limit', () => {
+  it('steps the mic sensitivity with , and . and stops at the limit', () => {
     renderPlayer();
-    press('ArrowUp');
+    press('.');
     expect(screen.getByText('0.20')).toBeDefined();
-    for (let i = 0; i < 10; i++) press('ArrowDown');
+    for (let i = 0; i < 10; i++) press(',');
     expect(screen.getByText('0.05')).toBeDefined();
   });
 
   it('leaves arrows to a focused slider', () => {
     renderPlayer();
-    press('ArrowRight', screen.getByRole('slider', { name: /velocidade/i }));
-    expect(screen.getByText('1.00x')).toBeDefined();
+    const slider = screen.getByRole('slider', { name: /velocidade/i });
+    slider.focus();
+    press('ArrowRight', slider);
+    expect(document.activeElement).toBe(slider);
   });
 
   it('still honors letter shortcuts while a button has focus', () => {
@@ -202,11 +214,11 @@ describe('ExercisePlayer keyboard shortcuts', () => {
     renderPlayer();
     press('m');
     expect(screen.getByRole('button', { name: 'Ligar microfone' })).toBeDefined();
-    expect(screen.getByText('Microfone desligado')).toBeDefined();
+    expect(screen.getByText('Mic desativado')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Ligar microfone' }));
     expect(screen.getByRole('button', { name: 'Desligar microfone' })).toBeDefined();
-    expect(screen.queryByText('Microfone desligado')).toBeNull();
+    expect(screen.queryByText('Mic desativado')).toBeNull();
   });
 
   it('asks for the previous/next exercise with PageUp/PageDown and [ ]', () => {
@@ -246,8 +258,50 @@ describe('ExercisePlayer keyboard shortcuts', () => {
 
   it('keeps stepping on auto-repeat', () => {
     renderPlayer();
-    press('ArrowRight', document.body, { repeat: true });
+    press('+', document.body, { repeat: true });
     expect(screen.getByText('1.25x')).toBeDefined();
+  });
+
+  it('navigates the wheel with the arrows from anywhere', () => {
+    renderPlayer();
+    press('ArrowRight');
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
+    press('ArrowRight', document.activeElement!);
+    press('ArrowDown', document.activeElement!);
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-D'));
+    press('ArrowLeft', document.activeElement!);
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
+    press('Home', document.activeElement!);
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
+  });
+
+  it('keeps Space as play/pause while a wheel note is selected', () => {
+    renderPlayer();
+    press('ArrowRight');
+    press(' ', document.activeElement!);
+    expect(screen.getByRole('button', { name: 'Retomar' })).toBeDefined();
+  });
+
+  it('keeps navigating the wheel on auto-repeat', () => {
+    renderPlayer();
+    press('ArrowRight');
+    press('ArrowRight', document.activeElement!, { repeat: true });
+    expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
+  });
+
+  it('shows the active microphone name', async () => {
+    const track = { stop: vi.fn(), label: 'USB Audio Device' };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [track], getAudioTracks: () => [track] })) },
+      configurable: true,
+    });
+    try {
+      renderPlayer();
+      await act(async () => {});
+      expect(screen.getByText('🎙️ USB Audio Device')).toBeDefined();
+    } finally {
+      Object.defineProperty(navigator, 'mediaDevices', { value: undefined, configurable: true });
+    }
   });
 
   it('opens the help from the keyboard button', () => {

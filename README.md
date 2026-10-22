@@ -23,10 +23,12 @@ quão perto você está da nota certa.
 - **Bolhas clicáveis** — toque em qualquer nota da roda pra ouvir como ela soa.
 - Página única com dropdown de exercícios — trocar de exercício não pede acesso ao
   microfone de novo, e a última lição escolhida fica salva entre recarregamentos.
-- **Controles pelo teclado** — Espaço (tocar/pausar), S (som), M (microfone), R
-  (repetir), ←/→ (velocidade), ↓/↑ (sensibilidade), PageUp/PageDown ou `[`/`]` (trocar
-  exercício) e `?` (lista de atalhos). A roda é um único Tab e as setas giram entre as
-  notas. O botão 🎙️ (ou M) libera o microfone de verdade.
+- **Controles pelo teclado** — setas navegam entre as notas da roda (Enter toca a nota,
+  Home volta ao C), Espaço toca/pausa o exercício, `-`/`+` mudam a velocidade, `,`/`.` a
+  sensibilidade do microfone, S/M/R alternam som, microfone e repetição,
+  PageUp/PageDown ou `[`/`]` trocam o exercício e `?` mostra a lista de atalhos.
+- **Microfone visível** — a linha de status mostra o nome do microfone em uso (ou "Mic
+  desativado"); o botão 🎙️ (ou M) libera o microfone de verdade.
 
 ## Rodando localmente
 
