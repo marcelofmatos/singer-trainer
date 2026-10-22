@@ -260,7 +260,7 @@ describe('PitchMeter', () => {
       <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
     );
     const c = screen.getByTestId('note-bubble-C');
-    c.focus();
+    act(() => c.focus());
 
     fireEvent.keyDown(c, { key: 'ArrowRight' });
     expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C#'));
@@ -279,7 +279,7 @@ describe('PitchMeter', () => {
       <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} onNoteClick={() => {}} />
     );
     const g = screen.getByTestId('note-bubble-G');
-    g.focus();
+    act(() => g.focus());
     fireEvent.keyDown(g, { key: 'Home' });
     expect(document.activeElement).toBe(screen.getByTestId('note-bubble-C'));
   });
