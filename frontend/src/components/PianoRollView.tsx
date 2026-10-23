@@ -145,6 +145,7 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected,
             width={block.width}
             height={block.height}
             fill={STATUS_COLORS[block.status]}
+            shapeRendering="crispEdges"
           />
         ))}
       </svg>

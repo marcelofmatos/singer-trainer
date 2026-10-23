@@ -228,4 +228,17 @@ describe('ExercisePlayer free mode', () => {
     });
     expect(savedHistory()).toHaveLength(1);
   });
+
+  it('keeps the just-recorded stretch in the overall score when both close events fire back to back', async () => {
+    const { setNote } = renderPlayer();
+    await flush();
+    setNote('mic', C4_IN_TUNE);
+    advance(500);
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    expect(screen.getByTestId('score-overall-percent-primary').textContent).toBe('100%');
+  });
 });

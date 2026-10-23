@@ -38,7 +38,7 @@ import {
   type NoteTallies,
   type ScoreTally,
 } from '../lib/scoring';
-import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
+import { appendScoreRecord, loadScoreHistory, totalTallyForInput, type ScoreRecord } from '../lib/scoreHistory';
 import {
   loadPianoRollFill,
   loadVisualization,
@@ -389,7 +389,7 @@ export function ExercisePlayer({
       const tallies = { ...passTalliesRef.current };
       const noteTallies = passNoteTalliesRef.current;
       if (effectiveReferenceId) delete tallies[effectiveReferenceId];
-      let latest = history;
+      let latest: ScoreRecord[] | null = null;
       lanes.forEach((lane, index) => {
         const tally = tallies[lane.id];
         if (!tally || tally.targetSeconds === 0) return;
@@ -404,7 +404,9 @@ export function ExercisePlayer({
           ...(isFreeMode ? { noteTallies: noteTallies[lane.id] ?? EMPTY_NOTE_TALLIES } : {}),
         });
       });
-      setHistory(latest);
+      // Only when something was recorded: back-to-back calls (visibilitychange then pagehide, no render in
+      // between) would otherwise overwrite the fresh history with this render's stale one.
+      if (latest) setHistory(latest);
       setSessionTallies((current) => {
         const next = { ...current };
         for (const [laneId, tally] of Object.entries(tallies)) {
