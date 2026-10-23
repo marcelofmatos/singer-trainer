@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendScoreRecord,
   bestScores,
+  freeNotePercentsByInput,
   loadScoreHistory,
   MAX_HISTORY,
   totalTally,
@@ -111,5 +112,48 @@ describe('scoreHistory', () => {
       targetSeconds: 12,
       hitSeconds: 7,
     });
+  });
+});
+
+describe('noteTallies and freeNotePercentsByInput', () => {
+  const tallies = (overrides: Record<number, [number, number]> = {}) =>
+    Array.from({ length: 12 }, (_, index) => ({
+      targetSeconds: overrides[index]?.[0] ?? 0,
+      hitSeconds: overrides[index]?.[1] ?? 0,
+    }));
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('loads a record with 12 valid note tallies', () => {
+    appendScoreRecord(record({ noteTallies: tallies() }));
+    expect(loadScoreHistory()).toHaveLength(1);
+  });
+
+  it('rejects note tallies with 11 entries or a non-number field', () => {
+    const bad = [
+      record({ noteTallies: tallies().slice(0, 11) }),
+      record({ noteTallies: [...tallies().slice(0, 11), { targetSeconds: '1', hitSeconds: 0 } as never] }),
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(bad));
+    expect(loadScoreHistory()).toEqual([]);
+  });
+
+  it('computes per-note percents per input, only for the free exercise', () => {
+    const history = [
+      record({ exerciseId: 'livre', noteTallies: tallies({ 0: [4, 1], 2: [2, 2] }) }),
+      record({ exerciseId: 'livre', noteTallies: tallies({ 0: [4, 3] }) }),
+      record({ exerciseId: 'livre', inputId: 'in-1', inputLabel: 'Monitor', noteTallies: tallies({ 5: [3, 1] }) }),
+      record({ exerciseId: 'escala-maior', noteTallies: tallies({ 7: [9, 9] }) }),
+    ];
+    const result = freeNotePercentsByInput(history);
+    expect(result.map((entry) => entry.inputId)).toEqual(['primary', 'in-1']);
+    expect(result[0].inputLabel).toBeNull();
+    expect(result[0].percents[0]).toBe(50);
+    expect(result[0].percents[2]).toBe(100);
+    expect(result[0].percents[7]).toBeNull();
+    expect(result[1].inputLabel).toBe('Monitor');
+    expect(result[1].percents[5]).toBe(33);
   });
 });

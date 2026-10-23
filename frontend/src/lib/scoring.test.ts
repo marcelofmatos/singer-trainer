@@ -1,6 +1,17 @@
 // frontend/src/lib/scoring.test.ts
 import { describe, expect, it } from 'vitest';
-import { addSample, addTallies, EMPTY_TALLY, formatSeconds, hitPercent, isHit } from './scoring';
+import {
+  addNoteSample,
+  addNoteTallies,
+  addSample,
+  addTallies,
+  EMPTY_NOTE_TALLIES,
+  EMPTY_TALLY,
+  formatSeconds,
+  hitPercent,
+  isHit,
+  isHitNearest,
+} from './scoring';
 
 const note = (midiNumber: number, cents: number) => ({ noteName: 'X', octave: 4, midiNumber, cents });
 
@@ -59,5 +70,44 @@ describe('formatSeconds', () => {
     expect(formatSeconds(48.24)).toBe('48,2 s');
     expect(formatSeconds(725)).toBe('12 min 05 s');
     expect(formatSeconds(59.96)).toBe('1 min 00 s');
+  });
+});
+
+describe('isHitNearest', () => {
+  it('accepts the nearest note within ±10 cents', () => {
+    expect(isHitNearest(note(61, 0))).toBe(true);
+    expect(isHitNearest(note(61, 10))).toBe(true);
+    expect(isHitNearest(note(61, -10))).toBe(true);
+    expect(isHitNearest(note(61, 11))).toBe(false);
+    expect(isHitNearest(note(61, -11))).toBe(false);
+  });
+
+  it('is never a hit without a detected note', () => {
+    expect(isHitNearest(null)).toBe(false);
+  });
+});
+
+describe('per-note tallies', () => {
+  it('starts with 12 empty tallies', () => {
+    expect(EMPTY_NOTE_TALLIES).toHaveLength(12);
+    EMPTY_NOTE_TALLIES.forEach((tally) => expect(tally).toEqual(EMPTY_TALLY));
+  });
+
+  it('adds a sample only to the pitch class of the note', () => {
+    const hit = addNoteSample(EMPTY_NOTE_TALLIES, 62, 0.5, true);
+    expect(hit).toHaveLength(12);
+    expect(hit[2]).toEqual({ targetSeconds: 0.5, hitSeconds: 0.5 });
+    hit.forEach((tally, index) => index === 2 || expect(tally).toEqual(EMPTY_TALLY));
+    const miss = addNoteSample(hit, 74, 0.25, false);
+    expect(miss[2]).toEqual({ targetSeconds: 0.75, hitSeconds: 0.5 });
+    expect(EMPTY_NOTE_TALLIES[2]).toEqual(EMPTY_TALLY);
+  });
+
+  it('sums two sets of tallies per index', () => {
+    const a = addNoteSample(EMPTY_NOTE_TALLIES, 60, 1, true);
+    const b = addNoteSample(addNoteSample(EMPTY_NOTE_TALLIES, 60, 2, false), 71, 1, true);
+    const sum = addNoteTallies(a, b);
+    expect(sum[0]).toEqual({ targetSeconds: 3, hitSeconds: 1 });
+    expect(sum[11]).toEqual({ targetSeconds: 1, hitSeconds: 1 });
   });
 });

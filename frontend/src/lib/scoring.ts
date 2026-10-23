@@ -21,6 +21,11 @@ export function isHit(detected: NoteInfo | null, targetMidi: number | null): boo
   return Math.abs(wrapped * 100 + detected.cents) <= HIT_TOLERANCE_CENTS;
 }
 
+/** Free singing: in tune when within the tolerance of the nearest note. */
+export function isHitNearest(detected: NoteInfo | null): boolean {
+  return detected !== null && Math.abs(detected.cents) <= HIT_TOLERANCE_CENTS;
+}
+
 export function addSample(tally: ScoreTally, seconds: number, hit: boolean): ScoreTally {
   return {
     targetSeconds: tally.targetSeconds + seconds,
@@ -30,6 +35,20 @@ export function addSample(tally: ScoreTally, seconds: number, hit: boolean): Sco
 
 export function addTallies(a: ScoreTally, b: ScoreTally): ScoreTally {
   return { targetSeconds: a.targetSeconds + b.targetSeconds, hitSeconds: a.hitSeconds + b.hitSeconds };
+}
+
+/** One tally per pitch class (0 = C … 11 = B). */
+export type NoteTallies = ScoreTally[];
+
+export const EMPTY_NOTE_TALLIES: NoteTallies = Array.from({ length: 12 }, () => EMPTY_TALLY);
+
+export function addNoteSample(tallies: NoteTallies, midiNumber: number, seconds: number, hit: boolean): NoteTallies {
+  const pitchClass = ((midiNumber % 12) + 12) % 12;
+  return tallies.map((tally, index) => (index === pitchClass ? addSample(tally, seconds, hit) : tally));
+}
+
+export function addNoteTallies(a: NoteTallies, b: NoteTallies): NoteTallies {
+  return a.map((tally, index) => addTallies(tally, b[index]));
 }
 
 export function hitPercent(tally: ScoreTally): number {

@@ -12,8 +12,8 @@ export interface Exercise {
   category: ExerciseCategory;
   description: string;
   notes: ExerciseNote[];
-  /** 'reference': the target comes from a chosen audio input instead of notes. */
-  mode?: 'reference';
+  /** 'reference': the target comes from a chosen audio input instead of notes. 'free': scored against the nearest note. */
+  mode?: 'reference' | 'free';
 }
 
 /** Builds an up-then-down note sequence (e.g. a scale) from a root note and a list of intervals. */
@@ -62,6 +62,16 @@ export const AUDIO_INPUT_EXERCISE: Exercise = {
     "Use uma das entradas (ex.: o 'Monitor of …' com um vídeo tocando) como referência das notas a cantar.",
   notes: [],
   mode: 'reference',
+};
+
+export const FREE_EXERCISE: Exercise = {
+  id: 'livre',
+  name: 'Exercício livre',
+  category: 'aquecimento',
+  description:
+    'Cante junto com uma música tocando em outra aba (use fone de ouvido): cada nota é medida contra a mais próxima, e a roda mostra a % de acerto de cada nota.',
+  notes: [],
+  mode: 'free',
 };
 
 export const BUILTIN_EXERCISES: Exercise[] = [
@@ -146,5 +156,6 @@ export const BUILTIN_EXERCISES: Exercise[] = [
       'precisão de afinação nota a nota, descendo pela escala menor.',
     notes: buildDescendingRepeatedScale(MIDDLE_C, MINOR_SCALE_INTERVALS, 3, 0.4),
   },
+  FREE_EXERCISE,
   AUDIO_INPUT_EXERCISE,
 ];

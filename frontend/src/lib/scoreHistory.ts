@@ -1,5 +1,13 @@
 // frontend/src/lib/scoreHistory.ts
-import { addTallies, EMPTY_TALLY, hitPercent, type ScoreTally } from './scoring';
+import {
+  addNoteTallies,
+  addTallies,
+  EMPTY_NOTE_TALLIES,
+  EMPTY_TALLY,
+  hitPercent,
+  type NoteTallies,
+  type ScoreTally,
+} from './scoring';
 
 const STORAGE_KEY = 'singer-trainer:score-history';
 export const MAX_HISTORY = 500;
@@ -15,6 +23,14 @@ export interface ScoreRecord extends ScoreTally {
   /** Lane that produced the record; absent on records from before multiple inputs (= primary). */
   inputId?: string;
   inputLabel?: string;
+  /** Per pitch class (C…B), only on free-exercise records. */
+  noteTallies?: ScoreTally[];
+}
+
+function isTally(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null) return false;
+  const tally = value as Record<string, unknown>;
+  return typeof tally.targetSeconds === 'number' && typeof tally.hitSeconds === 'number';
 }
 
 function isScoreRecord(value: unknown): value is ScoreRecord {
@@ -28,7 +44,9 @@ function isScoreRecord(value: unknown): value is ScoreRecord {
     typeof entry.targetSeconds === 'number' &&
     typeof entry.hitSeconds === 'number' &&
     (entry.inputId === undefined || typeof entry.inputId === 'string') &&
-    (entry.inputLabel === undefined || typeof entry.inputLabel === 'string')
+    (entry.inputLabel === undefined || typeof entry.inputLabel === 'string') &&
+    (entry.noteTallies === undefined ||
+      (Array.isArray(entry.noteTallies) && entry.noteTallies.length === 12 && entry.noteTallies.every(isTally)))
   );
 }
 
@@ -88,4 +106,31 @@ export function totalTally(history: ScoreRecord[]): ScoreTally {
 
 export function totalTallyForInput(history: ScoreRecord[], inputId: string): ScoreTally {
   return totalTally(history.filter((entry) => (entry.inputId ?? PRIMARY_INPUT_ID) === inputId));
+}
+
+const FREE_EXERCISE_ID = 'livre';
+
+export interface FreeNotePercents {
+  inputId: string;
+  inputLabel: string | null;
+  /** Per pitch class (C…B); null when that note was never sung. */
+  percents: (number | null)[];
+}
+
+export function freeNotePercentsByInput(history: ScoreRecord[]): FreeNotePercents[] {
+  const byInput = new Map<string, { inputLabel: string | null; tallies: NoteTallies }>();
+  for (const entry of history) {
+    if (entry.exerciseId !== FREE_EXERCISE_ID || !entry.noteTallies) continue;
+    const inputId = entry.inputId ?? PRIMARY_INPUT_ID;
+    const current = byInput.get(inputId);
+    byInput.set(inputId, {
+      inputLabel: entry.inputLabel ?? current?.inputLabel ?? null,
+      tallies: addNoteTallies(current?.tallies ?? EMPTY_NOTE_TALLIES, entry.noteTallies),
+    });
+  }
+  return [...byInput.entries()].map(([inputId, { inputLabel, tallies }]) => ({
+    inputId,
+    inputLabel,
+    percents: tallies.map((tally) => (tally.targetSeconds > 0 ? hitPercent(tally) : null)),
+  }));
 }

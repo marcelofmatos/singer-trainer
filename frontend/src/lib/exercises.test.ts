@@ -43,10 +43,10 @@ describe('BUILTIN_EXERCISES', () => {
     expect(categories.has('respiracao')).toBe(true);
   });
 
-  it('gives every exercise a unique id and, unless it is a reference exercise, at least one note', () => {
+  it('gives every exercise a unique id and, unless it is a reference or free exercise, at least one note', () => {
     const ids = BUILTIN_EXERCISES.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
-    BUILTIN_EXERCISES.filter((exercise) => exercise.mode !== 'reference').forEach((exercise) => {
+    BUILTIN_EXERCISES.filter((exercise) => exercise.mode !== 'reference' && exercise.mode !== 'free').forEach((exercise) => {
       expect(exercise.notes.length).toBeGreaterThan(0);
     });
   });
@@ -76,5 +76,12 @@ describe('BUILTIN_EXERCISES', () => {
     const exercise = BUILTIN_EXERCISES.find((e) => e.id === 'entrada-de-audio');
     expect(exercise).toMatchObject({ name: 'Entrada de áudio', mode: 'reference', notes: [] });
     expect(exercise?.description).toContain('Monitor of');
+  });
+
+  it('includes the free exercise, which has no notes of its own', () => {
+    const exercise = BUILTIN_EXERCISES.find((e) => e.id === 'livre');
+    expect(exercise).toMatchObject({ name: 'Exercício livre', mode: 'free', notes: [] });
+    expect(exercise?.description).toContain('outra aba');
+    expect(exercise?.description).toContain('fone');
   });
 });
