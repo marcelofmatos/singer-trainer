@@ -33,6 +33,7 @@ function renderLane(overrides: Partial<InputLaneProps> = {}) {
     audioInputs: INPUTS,
     onRefreshInputs: vi.fn(),
     onSelectDevice: vi.fn(),
+    onDeviceInUse: vi.fn(),
     onSample: vi.fn(),
     onNoteClick: vi.fn(),
     ...overrides,
@@ -125,6 +126,22 @@ describe('InputLane', () => {
     renderLane();
     const select = screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement;
     expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['USB', 'Monitor']);
+  });
+
+  it('reports the device its tracker actually opened', () => {
+    const props = renderLane({ lane: { id: 'primary', deviceId: null } });
+    expect(props.onDeviceInUse).toHaveBeenLastCalledWith('primary', 'usb');
+  });
+
+  it('asks for a device, without opening one, when a non-primary lane has none', () => {
+    tracker.state = { ...tracker.state, status: 'off', deviceId: null };
+    renderLane({ lane: { id: 'lane-2', deviceId: null }, position: 2, onRemove: vi.fn() });
+    expect(trackerCalls[trackerCalls.length - 1]).toEqual([0.15, false, null, { fallbackToDefault: false }]);
+    const select = screen.getByRole('combobox', { name: 'Entrada 2' }) as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.selectedOptions[0].textContent).toBe('Escolha um dispositivo');
+    expect(select.selectedOptions[0].disabled).toBe(true);
+    expect(screen.queryByText('Mic desativado')).toBeNull();
   });
 
   it('shows "Mic desativado" when off', () => {

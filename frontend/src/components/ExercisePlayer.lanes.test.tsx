@@ -111,6 +111,47 @@ describe('ExercisePlayer input lanes', () => {
     expect(saved.map((lane: { deviceId: string }) => lane.deviceId)).toEqual(['mic', 'monitor']);
   });
 
+  it('skips the pseudo "default" device and the one the primary lane actually opened', async () => {
+    localStorage.removeItem('singer-trainer:mic-device-id');
+    // The primary lane is on the system default (deviceId null) and its tracker reports 'usb'.
+    trackers.mic = { ...base, deviceId: 'usb' };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        enumerateDevices: vi.fn(async () => [
+          { deviceId: 'default', label: 'Padrão', kind: 'audioinput' },
+          { deviceId: 'usb', label: 'USB Mic', kind: 'audioinput' },
+          { deviceId: 'monitor', label: 'Monitor of JBL', kind: 'audioinput' },
+        ]),
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      configurable: true,
+    });
+    renderPlayer();
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: '+ Adicionar entrada' }));
+    await flush();
+    expect((screen.getByRole('combobox', { name: 'Entrada 2' }) as HTMLSelectElement).value).toBe('monitor');
+  });
+
+  it('still adds a lane, asking for a device, when every device is taken', async () => {
+    localStorage.setItem(
+      'singer-trainer:input-lanes',
+      JSON.stringify([
+        { id: 'primary', deviceId: 'mic' },
+        { id: 'lane-2', deviceId: 'monitor' },
+      ])
+    );
+    renderPlayer();
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: '+ Adicionar entrada' }));
+    await flush();
+    const select = screen.getByRole('combobox', { name: 'Entrada 3' }) as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(select.selectedOptions[0].textContent).toBe('Escolha um dispositivo');
+    expect(JSON.parse(localStorage.getItem('singer-trainer:input-lanes')!)[2].deviceId).toBeNull();
+  });
+
   it('removes a lane', async () => {
     renderPlayer();
     await flush();

@@ -19,6 +19,8 @@ export interface InputLaneProps {
   audioInputs: AudioInput[];
   onRefreshInputs: () => void;
   onSelectDevice: (deviceId: string) => void;
+  /** Reports the device this lane's tracker actually opened (null while none is open). */
+  onDeviceInUse: (laneId: string, deviceId: string | null) => void;
   onRemove?: () => void;
   onSample: (laneId: string, hit: boolean) => void;
   onNoteClick: (pitchClass: number) => void;
@@ -39,13 +41,18 @@ export function InputLane({
   audioInputs,
   onRefreshInputs,
   onSelectDevice,
+  onDeviceInUse,
   onRemove,
   onSample,
   onNoteClick,
   wheelRef,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
-  const tracker = usePitchTracker(sensitivity, micEnabled, lane.deviceId, { fallbackToDefault: isPrimary });
+  // An extra lane with no device yet waits for a choice instead of opening the system default.
+  const needsDevice = !isPrimary && lane.deviceId === null;
+  const tracker = usePitchTracker(sensitivity, micEnabled && !needsDevice, lane.deviceId, {
+    fallbackToDefault: isPrimary,
+  });
   const name = isPrimary ? 'Microfone' : `Entrada ${position}`;
   const detected = tracker.status === 'listening' ? tracker.currentNote : null;
   const selectedDeviceId = tracker.deviceId ?? lane.deviceId ?? '';
@@ -56,6 +63,15 @@ export function InputLane({
   useEffect(() => {
     if (tracker.deviceId) onRefreshInputs();
   }, [tracker.deviceId, onRefreshInputs]);
+
+  // Read through a ref so an inline callback from the parent doesn't re-run the effect.
+  const onDeviceInUseRef = useRef(onDeviceInUse);
+  useEffect(() => {
+    onDeviceInUseRef.current = onDeviceInUse;
+  });
+  useEffect(() => {
+    onDeviceInUseRef.current(lane.id, tracker.deviceId);
+  }, [lane.id, tracker.deviceId]);
 
   // Sampled on its own tick from a ref so the interval isn't re-armed on every detection update.
   const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null }>({
@@ -93,6 +109,11 @@ export function InputLane({
             value={selectedDeviceId}
             onChange={(event) => onSelectDevice(event.target.value)}
           >
+            {needsDevice && (
+              <option value="" disabled>
+                Escolha um dispositivo
+              </option>
+            )}
             {deviceMissing && (
               <option value={selectedDeviceId} disabled>
                 Entrada desconectada
@@ -137,7 +158,7 @@ export function InputLane({
       {tracker.status === 'listening' && audioInputs.length === 0 && (
         <p className="status-message">🎙️ {tracker.deviceName ?? 'Microfone ativo'}</p>
       )}
-      {tracker.status === 'off' && <p className="status-message">Mic desativado</p>}
+      {tracker.status === 'off' && !needsDevice && <p className="status-message">Mic desativado</p>}
 
       <div className="wheel-stage">
         <PitchMeter

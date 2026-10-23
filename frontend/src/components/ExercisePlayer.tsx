@@ -64,6 +64,8 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   const [historyOpen, setHistoryOpen] = useState(false);
   const [lanes, setLanes] = useState<InputLaneConfig[]>(() => loadInputLanes());
   const [micOff, setMicOff] = useState<Record<string, boolean>>({});
+  // The device each lane's tracker actually opened (the primary lane on the system default has deviceId null).
+  const [devicesInUse, setDevicesInUse] = useState<Record<string, string | null>>({});
   const [passTallies, setPassTallies] = useState<Record<string, ScoreTally>>({});
   // Mirrors passTallies synchronously: a lane may sample in the same tick the pass ends, before
   // a re-render, and that sample must still be counted in the pass being completed.
@@ -177,12 +179,25 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   }
 
   function addLane() {
-    setLanes((current) => [...current, { id: createLaneId(), deviceId: nextFreeDeviceId(current, audioInputs.inputs) }]);
+    const inUse = Object.values(devicesInUse).filter((deviceId): deviceId is string => deviceId !== null);
+    setLanes((current) => [
+      ...current,
+      { id: createLaneId(), deviceId: nextFreeDeviceId(current, audioInputs.inputs, inUse) },
+    ]);
   }
 
   function removeLane(laneId: string) {
     setLanes((current) => current.filter((lane) => lane.id !== laneId));
+    setDevicesInUse((current) => {
+      const next = { ...current };
+      delete next[laneId];
+      return next;
+    });
   }
+
+  const handleDeviceInUse = useCallback((laneId: string, deviceId: string | null) => {
+    setDevicesInUse((current) => (current[laneId] === deviceId ? current : { ...current, [laneId]: deviceId }));
+  }, []);
 
   function selectLaneDevice(laneId: string, deviceId: string) {
     setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, deviceId } : lane)));
@@ -360,6 +375,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
               audioInputs={audioInputs.inputs}
               onRefreshInputs={audioInputs.refresh}
               onSelectDevice={(deviceId) => selectLaneDevice(lane.id, deviceId)}
+              onDeviceInUse={handleDeviceInUse}
               onRemove={lane.id === PRIMARY_LANE_ID ? undefined : () => removeLane(lane.id)}
               onSample={handleSample}
               onNoteClick={handleNoteClick}

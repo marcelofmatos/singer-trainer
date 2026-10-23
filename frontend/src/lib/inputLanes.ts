@@ -39,10 +39,22 @@ export function saveInputLanes(lanes: InputLaneConfig[]): void {
   if (primaryDeviceId) saveMicDeviceId(primaryDeviceId);
 }
 
-/** First available device not already used by a lane, or null when all are taken. */
-export function nextFreeDeviceId(lanes: InputLaneConfig[], available: AudioInput[]): string | null {
-  const used = new Set(lanes.map((lane) => lane.deviceId));
-  return available.find((input) => !used.has(input.deviceId))?.deviceId ?? null;
+// Chrome's aliases for a real device that is also listed under its own id.
+const PSEUDO_DEVICE_IDS = new Set(['default', 'communications']);
+
+/**
+ * First real device that no lane is configured with or has actually opened (`inUseDeviceIds`),
+ * or null when all are taken.
+ */
+export function nextFreeDeviceId(
+  lanes: InputLaneConfig[],
+  available: AudioInput[],
+  inUseDeviceIds: string[] = []
+): string | null {
+  const used = new Set<string | null>([...lanes.map((lane) => lane.deviceId), ...inUseDeviceIds]);
+  return (
+    available.find((input) => !PSEUDO_DEVICE_IDS.has(input.deviceId) && !used.has(input.deviceId))?.deviceId ?? null
+  );
 }
 
 export function createLaneId(): string {
