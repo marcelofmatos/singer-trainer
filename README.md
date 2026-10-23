@@ -41,6 +41,10 @@ quão perto você está da nota certa.
   topo (ou com V) entre **piano-roll** (altura da voz ao longo do tempo sobre a nota-alvo),
   **afinador cromático** (nota grande e ponteiro de ±50 cents) e **teclado** de duas
   oitavas com a tecla cantada acesa. A escolha fica salva.
+- **Entrada de áudio como referência** — no exercício "Entrada de áudio", escolha uma
+  entrada (ex.: o "Monitor of …" com um vídeo do YouTube tocando) como referência: as notas
+  dela viram o alvo das outras faixas, e a pontuação vale enquanto a referência canta
+  (acerto se você cantar a mesma nota, em qualquer oitava, até 0,5 s depois).
 
 ## Rodando localmente
 

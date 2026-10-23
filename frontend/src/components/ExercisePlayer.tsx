@@ -1,5 +1,5 @@
 // frontend/src/components/ExercisePlayer.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
 import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
@@ -16,7 +16,17 @@ import {
   type InputLaneConfig,
 } from '../lib/inputLanes';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
-import { addSample, addTallies, EMPTY_TALLY, type ScoreTally } from '../lib/scoring';
+import type { NoteInfo } from '../lib/noteUtils';
+import {
+  defaultReferenceLaneId,
+  loadReferenceLaneId,
+  matchesReference,
+  pushReferenceSample,
+  REFERENCE_TOLERANCE_MS,
+  saveReferenceLaneId,
+  type ReferenceSample,
+} from '../lib/referenceMatch';
+import { addSample, addTallies, EMPTY_TALLY, isHit, type ScoreTally } from '../lib/scoring';
 import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
 import {
   loadVisualization,
@@ -63,6 +73,8 @@ export function ExercisePlayer({
   onNextExercise,
   exerciseSelect,
 }: ExercisePlayerProps) {
+  // The reference mode has no tone or clock: another input's live notes are the target.
+  const isReferenceMode = exercise.mode === 'reference';
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
@@ -89,6 +101,13 @@ export function ExercisePlayer({
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
   const [visualization, setVisualization] = useState(() => loadVisualization());
+  const [referenceLaneId, setReferenceLaneId] = useState(() => loadReferenceLaneId());
+  // The reference's current semitone; only changes when the semitone does, so cents jitter doesn't re-render.
+  const [referenceTarget, setReferenceTarget] = useState<number | null>(null);
+  // Notes the reference held until recently, so a late singer still hits within the tolerance.
+  const referenceHistoryRef = useRef<ReferenceSample[]>([]);
+  // The note each lane hears right now, as last reported by the lane.
+  const latestNotesRef = useRef<Record<string, NoteInfo | null>>({});
   const audioInputs = useAudioInputs(null);
 
   useEffect(() => saveInputLanes(lanes), [lanes]);
@@ -129,12 +148,24 @@ export function ExercisePlayer({
     savePlaybackPreferences({ playbackRate, loop, micSensitivity });
   }, [playbackRate, loop, micSensitivity]);
 
+  // The speed has no effect in reference mode; keeping it out stops it from resetting the running pass.
+  const timingRate = isReferenceMode ? 1 : playbackRate;
   const scaledExercise = useMemo(
-    () => scaleExerciseTiming(exercise, playbackRate),
-    [exercise, playbackRate]
+    () => scaleExerciseTiming(exercise, timingRate),
+    [exercise, timingRate]
   );
 
   useEffect(() => {
+    if (isReferenceMode) {
+      // An empty exercise would "end" on the first poll, so there is no tone or clock at all.
+      setToneError(null);
+      setElapsed(0);
+      setEnded(false);
+      passTalliesRef.current = {};
+      setPassTallies({});
+      return;
+    }
+
     let audioContext: AudioContext | null = null;
     let pollTimer: ReturnType<typeof setInterval> | null = null;
     let hasEnded = false;
@@ -185,7 +216,7 @@ export function ExercisePlayer({
       audioContextRef.current = null;
       gainRef.current = null;
     };
-  }, [scaledExercise, cycle]);
+  }, [scaledExercise, cycle, isReferenceMode]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
@@ -199,6 +230,50 @@ export function ExercisePlayer({
       inputs.find((input) => input.deviceId === lane.deviceId);
     return device?.label ?? (lane.id === PRIMARY_LANE_ID ? 'Microfone' : `Entrada ${position}`);
   }
+
+  function laneLabelById(laneId: string): string {
+    const index = lanes.findIndex((lane) => lane.id === laneId);
+    return laneLabel(lanes[index], index + 1);
+  }
+
+  const effectiveReferenceId = !isReferenceMode
+    ? null
+    : lanes.some((lane) => lane.id === referenceLaneId && lane.id !== PRIMARY_LANE_ID)
+      ? referenceLaneId
+      : defaultReferenceLaneId(
+          lanes.map((lane) => lane.id),
+          laneLabelById
+        );
+
+  // Synced before the lanes' (passive) effects run, so their reports and samples see this render's values.
+  const referenceIdRef = useRef(effectiveReferenceId);
+  const exerciseTargetRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    referenceIdRef.current = effectiveReferenceId;
+    exerciseTargetRef.current = targetNote?.midiNumber ?? null;
+  });
+
+  // A new reference starts from what it hears now, without the previous reference's notes.
+  useLayoutEffect(() => {
+    referenceHistoryRef.current = [];
+    const note = effectiveReferenceId ? latestNotesRef.current[effectiveReferenceId] ?? null : null;
+    setReferenceTarget(note ? note.midiNumber : null);
+  }, [effectiveReferenceId]);
+
+  const handleNote = useCallback((laneId: string, note: NoteInfo | null) => {
+    const previous = latestNotesRef.current[laneId] ?? null;
+    latestNotesRef.current = { ...latestNotesRef.current, [laneId]: note };
+    if (laneId !== referenceIdRef.current) return;
+    // The note just left still counts for the tolerance window from now on.
+    if (previous) {
+      referenceHistoryRef.current = pushReferenceSample(
+        referenceHistoryRef.current,
+        { time: Date.now(), midi: previous.midiNumber, cents: previous.cents },
+        REFERENCE_TOLERANCE_MS
+      );
+    }
+    setReferenceTarget(note ? note.midiNumber : null);
+  }, []);
 
   function addLane() {
     const inUse = Object.values(devicesInUse);
@@ -240,17 +315,30 @@ export function ExercisePlayer({
     setMicOff((current) => ({ ...current, [laneId]: !current[laneId] }));
   }
 
-  const handleSample = useCallback((laneId: string, hit: boolean) => {
+  const handleSample = useCallback((laneId: string, detected: NoteInfo | null) => {
+    let hit: boolean;
+    if (referenceIdRef.current === null) {
+      hit = isHit(detected, exerciseTargetRef.current);
+    } else {
+      const now = Date.now();
+      const held = latestNotesRef.current[referenceIdRef.current] ?? null;
+      const history = held
+        ? [...referenceHistoryRef.current, { time: now, midi: held.midiNumber, cents: held.cents }]
+        : referenceHistoryRef.current;
+      hit = matchesReference(detected, history, now, REFERENCE_TOLERANCE_MS);
+    }
     const current = passTalliesRef.current;
     passTalliesRef.current = { ...current, [laneId]: addSample(current[laneId] ?? EMPTY_TALLY, SAMPLE_SECONDS, hit) };
     setPassTallies(passTalliesRef.current);
   }, []);
 
-  // Called by the playback poll when a pass reaches its end: each lane's pass moves into its
-  // session and the stored history (and leaves the live pass tallies, so nothing is counted twice).
+  // Called when a pass ends (the playback poll; in reference mode pausing, leaving or hiding the
+  // page): each lane's pass moves into its session and the stored history (and leaves the live
+  // pass tallies, so nothing is counted twice). The reference lane is never recorded.
   useEffect(() => {
     completePassRef.current = () => {
-      const tallies = passTalliesRef.current;
+      const tallies = { ...passTalliesRef.current };
+      if (effectiveReferenceId) delete tallies[effectiveReferenceId];
       let latest = history;
       lanes.forEach((lane, index) => {
         const tally = tallies[lane.id];
@@ -278,7 +366,24 @@ export function ExercisePlayer({
     };
   });
 
+  useEffect(() => {
+    if (!isReferenceMode) return;
+    const recordPass = () => completePassRef.current();
+    const recordIfHidden = () => {
+      if (document.visibilityState === 'hidden') recordPass();
+    };
+    document.addEventListener('visibilitychange', recordIfHidden);
+    window.addEventListener('pagehide', recordPass);
+    return () => {
+      document.removeEventListener('visibilitychange', recordIfHidden);
+      window.removeEventListener('pagehide', recordPass);
+      // Leaving the exercise (or the page) ends the running pass; this still sees the old closure.
+      recordPass();
+    };
+  }, [isReferenceMode, exercise.id]);
+
   function togglePlaying() {
+    if (isReferenceMode && playing) completePassRef.current();
     if (ended) {
       setCycle((c) => c + 1);
       setPlaying(true);
@@ -374,14 +479,17 @@ export function ExercisePlayer({
   return (
     <section className="exercise-panel">
       <ScoreBoard
-        rows={lanes.map((lane, index) => {
+        rows={lanes.flatMap((lane, index) => {
+          if (lane.id === effectiveReferenceId) return [];
           const pass = passTallies[lane.id] ?? EMPTY_TALLY;
-          return {
-            laneId: lane.id,
-            label: laneLabel(lane, index + 1),
-            session: addTallies(sessionTallies[lane.id] ?? EMPTY_TALLY, pass),
-            overall: addTallies(totalTallyForInput(history, lane.id), pass),
-          };
+          return [
+            {
+              laneId: lane.id,
+              label: laneLabel(lane, index + 1),
+              session: addTallies(sessionTallies[lane.id] ?? EMPTY_TALLY, pass),
+              overall: addTallies(totalTallyForInput(history, lane.id), pass),
+            },
+          ];
         })}
         onOpenHistory={() => setHistoryOpen(true)}
       />
@@ -418,6 +526,31 @@ export function ExercisePlayer({
       <div className="exercise-info">
         <h2 className="exercise-title">{exercise.name}</h2>
         <p className="exercise-description">{exercise.description}</p>
+        {isReferenceMode &&
+          (effectiveReferenceId ? (
+            <label className="speed-control">
+              Referência
+              <select
+                className="view-select"
+                aria-label="Referência"
+                value={effectiveReferenceId}
+                onChange={(event) => {
+                  setReferenceLaneId(event.target.value);
+                  saveReferenceLaneId(event.target.value);
+                }}
+              >
+                {lanes.map((lane, index) =>
+                  lane.id === PRIMARY_LANE_ID ? null : (
+                    <option key={lane.id} value={lane.id}>
+                      {laneLabel(lane, index + 1)}
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
+          ) : (
+            <p className="status-message">Adicione uma entrada (ex.: Monitor of …) para usar como referência.</p>
+          ))}
 
         {toneError && (
           <p className="status-message" role="alert">
@@ -436,7 +569,13 @@ export function ExercisePlayer({
               sensitivity={micSensitivity}
               micEnabled={!micOff[lane.id]}
               onToggleMic={() => toggleLaneMic(lane.id)}
-              targetMidiNumber={targetNote?.midiNumber ?? null}
+              targetMidiNumber={
+                lane.id === effectiveReferenceId
+                  ? null
+                  : isReferenceMode
+                    ? referenceTarget
+                    : targetNote?.midiNumber ?? null
+              }
               scoringActive={playing && !ended}
               audioInputs={audioInputs.inputs}
               onRefreshInputs={audioInputs.refresh}
@@ -444,6 +583,8 @@ export function ExercisePlayer({
               onDeviceInUse={handleDeviceInUse}
               onRemove={lane.id === PRIMARY_LANE_ID ? undefined : () => removeLane(lane.id)}
               onSample={handleSample}
+              onNote={handleNote}
+              isReference={lane.id === effectiveReferenceId}
               onPlayNote={playNote}
               visualization={visualization}
               wheelRef={lane.id === PRIMARY_LANE_ID ? wheelRef : undefined}
@@ -466,24 +607,28 @@ export function ExercisePlayer({
           {playing ? '⏸' : '▶'}
         </button>
 
-        <button
-          type="button"
-          className="icon-button"
-          onClick={() => setMuted((m) => !m)}
-          aria-pressed={muted}
-          aria-label={muted ? 'Ativar som' : 'Silenciar'}
-        >
-          {muted ? '🔇' : '🔊'}
-        </button>
+        {!isReferenceMode && (
+          <>
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => setMuted((m) => !m)}
+              aria-pressed={muted}
+              aria-label={muted ? 'Ativar som' : 'Silenciar'}
+            >
+              {muted ? '🔇' : '🔊'}
+            </button>
 
-        <label className="loop-toggle">
-          <input
-            type="checkbox"
-            checked={loop}
-            onChange={(event) => setLoop(event.target.checked)}
-          />
-          Repetir
-        </label>
+            <label className="loop-toggle">
+              <input
+                type="checkbox"
+                checked={loop}
+                onChange={(event) => setLoop(event.target.checked)}
+              />
+              Repetir
+            </label>
+          </>
+        )}
 
         <label className="speed-control">
           Sensibilidade do microfone
