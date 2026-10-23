@@ -92,9 +92,24 @@ describe('PianoRollView', () => {
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
   });
 
-  it('labels the C rows', () => {
+  it('labels every semitone row when there is room', () => {
     render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
-    expect(screen.getByText('C4')).toBeDefined();
+    ['C4', 'C#4', 'D4', 'D#4', 'E4', 'F4', 'F#4', 'G4', 'G#4', 'A4', 'A#4', 'B4', 'C5'].forEach((label) => {
+      expect(screen.getByText(label)).toBeDefined();
+    });
+  });
+
+  it('labels only the natural notes when the range is too tall for every row', () => {
+    const { rerender } = render(<PianoRollView detectedNote={note(40, 0)} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    rerender(<PianoRollView detectedNote={note(76, 0)} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    expect(screen.getByText('D4')).toBeDefined();
+    expect(screen.queryByText('C#4')).toBeNull();
   });
 
   it('shows the sung note above the roll, and the mic icon when the mic fails', () => {

@@ -43,10 +43,10 @@ describe('BUILTIN_EXERCISES', () => {
     expect(categories.has('respiracao')).toBe(true);
   });
 
-  it('gives every exercise a unique id and at least one note', () => {
+  it('gives every exercise a unique id and, unless it is a reference exercise, at least one note', () => {
     const ids = BUILTIN_EXERCISES.map((e) => e.id);
     expect(new Set(ids).size).toBe(ids.length);
-    BUILTIN_EXERCISES.forEach((exercise) => {
+    BUILTIN_EXERCISES.filter((exercise) => exercise.mode !== 'reference').forEach((exercise) => {
       expect(exercise.notes.length).toBeGreaterThan(0);
     });
   });
@@ -70,5 +70,11 @@ describe('BUILTIN_EXERCISES', () => {
     const ids = BUILTIN_EXERCISES.map((e) => e.id);
     expect(ids).toContain('escala-menor-c4');
     expect(ids).toContain('escala-menor-degraus');
+  });
+
+  it('includes the audio-input reference exercise, which has no notes of its own', () => {
+    const exercise = BUILTIN_EXERCISES.find((e) => e.id === 'entrada-de-audio');
+    expect(exercise).toMatchObject({ name: 'Entrada de áudio', mode: 'reference', notes: [] });
+    expect(exercise?.description).toContain('Monitor of');
   });
 });

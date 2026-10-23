@@ -12,6 +12,8 @@ export interface Exercise {
   category: ExerciseCategory;
   description: string;
   notes: ExerciseNote[];
+  /** 'reference': the target comes from a chosen audio input instead of notes. */
+  mode?: 'reference';
 }
 
 /** Builds an up-then-down note sequence (e.g. a scale) from a root note and a list of intervals. */
@@ -51,6 +53,16 @@ export function buildDescendingRepeatedScale(
 const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11, 12];
 const MINOR_SCALE_INTERVALS = [0, 2, 3, 5, 7, 8, 10, 12]; // Dó-Ré-Mib-Fá-Sol-Láb-Sib-Dó
 const MIDDLE_C = 60;
+
+export const AUDIO_INPUT_EXERCISE: Exercise = {
+  id: 'entrada-de-audio',
+  name: 'Entrada de áudio',
+  category: 'aquecimento',
+  description:
+    "Use uma das entradas (ex.: o 'Monitor of …' com um vídeo tocando) como referência das notas a cantar.",
+  notes: [],
+  mode: 'reference',
+};
 
 export const BUILTIN_EXERCISES: Exercise[] = [
   {
@@ -134,4 +146,5 @@ export const BUILTIN_EXERCISES: Exercise[] = [
       'precisão de afinação nota a nota, descendo pela escala menor.',
     notes: buildDescendingRepeatedScale(MIDDLE_C, MINOR_SCALE_INTERVALS, 3, 0.4),
   },
+  AUDIO_INPUT_EXERCISE,
 ];
