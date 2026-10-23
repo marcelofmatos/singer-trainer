@@ -14,7 +14,24 @@ const base: PitchTrackerState = {
   waveform: [],
   deviceName: null,
   deviceId: null,
+  groupId: null,
 };
+
+// Chrome lists the "default" alias with the same group as the real device behind it.
+function stubGroupedDevices() {
+  Object.defineProperty(navigator, 'mediaDevices', {
+    value: {
+      enumerateDevices: vi.fn(async () => [
+        { deviceId: 'default', label: 'Padrão', kind: 'audioinput', groupId: 'g-usb' },
+        { deviceId: 'usb', label: 'USB Mic', kind: 'audioinput', groupId: 'g-usb' },
+        { deviceId: 'monitor', label: 'Monitor of JBL', kind: 'audioinput', groupId: 'g-jbl' },
+      ]),
+      addEventListener() {},
+      removeEventListener() {},
+    },
+    configurable: true,
+  });
+}
 
 vi.mock('../hooks/usePitchTracker', () => ({
   usePitchTracker: (_s: number, enabled: boolean, deviceId: string | null) =>
@@ -132,6 +149,51 @@ describe('ExercisePlayer input lanes', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ Adicionar entrada' }));
     await flush();
     expect((screen.getByRole('combobox', { name: 'Entrada 2' }) as HTMLSelectElement).value).toBe('monitor');
+  });
+
+  it('skips the real device behind the "default" alias the primary lane opened', async () => {
+    localStorage.removeItem('singer-trainer:mic-device-id');
+    trackers.mic = { ...base, deviceId: 'default', groupId: 'g-usb' };
+    stubGroupedDevices();
+    renderPlayer();
+    await flush();
+    fireEvent.click(screen.getByRole('button', { name: '+ Adicionar entrada' }));
+    await flush();
+    expect((screen.getByRole('combobox', { name: 'Entrada 2' }) as HTMLSelectElement).value).toBe('monitor');
+  });
+
+  it('labels the primary lane on the system default with the real device in use', async () => {
+    localStorage.removeItem('singer-trainer:mic-device-id');
+    trackers.mic = {
+      ...base,
+      deviceId: 'default',
+      groupId: 'g-usb',
+      currentNote: { noteName: 'C', octave: 4, midiNumber: 60, cents: 0 },
+    };
+    stubGroupedDevices();
+    renderPlayer();
+    await flush();
+    advance(1200);
+    const history = JSON.parse(localStorage.getItem('singer-trainer:score-history')!);
+    expect(history[0].inputLabel).toBe('USB Mic');
+    expect(screen.getByTitle('USB Mic')).toBeDefined();
+  });
+
+  it('does not record a lane removed in the middle of a pass', async () => {
+    localStorage.setItem(
+      'singer-trainer:input-lanes',
+      JSON.stringify([
+        { id: 'primary', deviceId: 'mic' },
+        { id: 'lane-2', deviceId: 'monitor' },
+      ])
+    );
+    renderPlayer();
+    await flush();
+    advance(500);
+    fireEvent.click(screen.getByRole('button', { name: 'Remover entrada 2' }));
+    advance(700);
+    const history = JSON.parse(localStorage.getItem('singer-trainer:score-history')!);
+    expect(history.map((entry: { inputId: string }) => entry.inputId)).toEqual(['primary']);
   });
 
   it('still adds a lane, asking for a device, when every device is taken', async () => {

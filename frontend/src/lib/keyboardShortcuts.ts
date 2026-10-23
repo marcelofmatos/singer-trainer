@@ -87,7 +87,7 @@ export const SHORTCUT_HELP: { keys: string; description: string }[] = [
   { keys: '- / +', description: 'Diminuir / aumentar a velocidade' },
   { keys: ', / .', description: 'Diminuir / aumentar a sensibilidade do microfone' },
   { keys: 'S', description: 'Silenciar / ativar o som da referência' },
-  { keys: 'M', description: 'Ligar / desligar o microfone' },
+  { keys: 'M', description: 'Ligar / desligar o microfone da primeira entrada' },
   { keys: 'R', description: 'Repetir o exercício' },
   { keys: 'PageUp ou [', description: 'Exercício anterior' },
   { keys: 'PageDown ou ]', description: 'Próximo exercício' },

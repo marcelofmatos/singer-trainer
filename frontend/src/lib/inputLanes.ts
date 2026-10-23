@@ -42,18 +42,42 @@ export function saveInputLanes(lanes: InputLaneConfig[]): void {
 // Chrome's aliases for a real device that is also listed under its own id.
 const PSEUDO_DEVICE_IDS = new Set(['default', 'communications']);
 
+function isRealInput(input: AudioInput): boolean {
+  return !PSEUDO_DEVICE_IDS.has(input.deviceId);
+}
+
 /**
  * First real device that no lane is configured with or has actually opened (`inUseDeviceIds`),
- * or null when all are taken.
+ * nor shares a physical device (groupId) with one, or null when all are taken.
  */
 export function nextFreeDeviceId(
   lanes: InputLaneConfig[],
   available: AudioInput[],
-  inUseDeviceIds: string[] = []
+  inUseDeviceIds: string[] = [],
+  inUseGroupIds: string[] = []
 ): string | null {
-  const used = new Set<string | null>([...lanes.map((lane) => lane.deviceId), ...inUseDeviceIds]);
+  const usedIds = new Set<string | null>([...lanes.map((lane) => lane.deviceId), ...inUseDeviceIds]);
+  const usedGroups = new Set(inUseGroupIds);
+  for (const input of available) {
+    if (input.groupId && usedIds.has(input.deviceId)) usedGroups.add(input.groupId);
+  }
+  const free = available.find(
+    (input) =>
+      isRealInput(input) && !usedIds.has(input.deviceId) && !(input.groupId && usedGroups.has(input.groupId))
+  );
+  return free?.deviceId ?? null;
+}
+
+/** The real (non-alias) listed input behind a device in use, matched by id and then by group. */
+export function findRealInput(
+  available: AudioInput[],
+  deviceId: string | null,
+  groupId: string | null
+): AudioInput | undefined {
+  const real = available.filter(isRealInput);
   return (
-    available.find((input) => !PSEUDO_DEVICE_IDS.has(input.deviceId) && !used.has(input.deviceId))?.deviceId ?? null
+    real.find((input) => input.deviceId === deviceId) ??
+    (groupId ? real.find((input) => input.groupId === groupId) : undefined)
   );
 }
 

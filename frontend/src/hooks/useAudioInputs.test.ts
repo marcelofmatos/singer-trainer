@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useAudioInputs } from './useAudioInputs';
 
-let devices: Array<{ deviceId: string; label: string; kind: string }>;
+let devices: Array<{ deviceId: string; label: string; kind: string; groupId?: string }>;
 let deviceChangeListener: (() => void) | null;
 let enumerateDevices: ReturnType<typeof vi.fn>;
 
@@ -44,6 +44,20 @@ describe('useAudioInputs', () => {
       expect(result.current.inputs).toEqual([
         { deviceId: 'default', label: 'Padrão' },
         { deviceId: 'usb', label: 'Microfone 2' },
+      ])
+    );
+  });
+
+  it('keeps the group of each microphone when the browser gives one', async () => {
+    devices = [
+      { deviceId: 'default', label: 'Padrão', kind: 'audioinput', groupId: 'g-usb' },
+      { deviceId: 'usb', label: 'USB Mic', kind: 'audioinput', groupId: 'g-usb' },
+    ];
+    const { result } = renderHook(() => useAudioInputs(null));
+    await waitFor(() =>
+      expect(result.current.inputs).toEqual([
+        { deviceId: 'default', label: 'Padrão', groupId: 'g-usb' },
+        { deviceId: 'usb', label: 'USB Mic', groupId: 'g-usb' },
       ])
     );
   });

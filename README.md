@@ -35,7 +35,8 @@ quão perto você está da nota certa.
   pontuação: adicione o seu microfone, o "Monitor of …" do sistema (para captar a voz de
   um vídeo tocando em outra aba) ou outro mic, com "+ Adicionar entrada". Cada faixa tem
   seletor de dispositivo e liga/desliga; a montagem fica salva, e uma entrada
-  desconectada aparece como tal até voltar.
+  desconectada aparece como tal até voltar. A tecla M liga/desliga o microfone da
+  primeira entrada (as outras usam o próprio botão).
 
 ## Rodando localmente
 

@@ -19,8 +19,8 @@ export interface InputLaneProps {
   audioInputs: AudioInput[];
   onRefreshInputs: () => void;
   onSelectDevice: (deviceId: string) => void;
-  /** Reports the device this lane's tracker actually opened (null while none is open). */
-  onDeviceInUse: (laneId: string, deviceId: string | null) => void;
+  /** Reports the device (and its group) this lane's tracker actually opened; null while none is open. */
+  onDeviceInUse: (laneId: string, deviceId: string | null, groupId: string | null) => void;
   onRemove?: () => void;
   onSample: (laneId: string, hit: boolean) => void;
   onNoteClick: (pitchClass: number) => void;
@@ -70,8 +70,8 @@ export function InputLane({
     onDeviceInUseRef.current = onDeviceInUse;
   });
   useEffect(() => {
-    onDeviceInUseRef.current(lane.id, tracker.deviceId);
-  }, [lane.id, tracker.deviceId]);
+    onDeviceInUseRef.current(lane.id, tracker.deviceId, tracker.groupId);
+  }, [lane.id, tracker.deviceId, tracker.groupId]);
 
   // Sampled on its own tick from a ref so the interval isn't re-armed on every detection update.
   const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null }>({
@@ -159,6 +159,7 @@ export function InputLane({
         <p className="status-message">🎙️ {tracker.deviceName ?? 'Microfone ativo'}</p>
       )}
       {tracker.status === 'off' && !needsDevice && <p className="status-message">Mic desativado</p>}
+      {needsDevice && audioInputs.length === 0 && <p className="status-message">Escolha um dispositivo</p>}
 
       <div className="wheel-stage">
         <PitchMeter

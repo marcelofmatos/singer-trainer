@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 export interface AudioInput {
   deviceId: string;
   label: string;
+  /** Physical device this input belongs to; aliases like Chrome's "default" share it with the real device. */
+  groupId?: string;
 }
 
 /**
@@ -21,7 +23,11 @@ export function useAudioInputs(refreshKey: unknown): { inputs: AudioInput[]; ref
     setInputs(
       devices
         .filter((device) => device.kind === 'audioinput')
-        .map((device, index) => ({ deviceId: device.deviceId, label: device.label || `Microfone ${index + 1}` }))
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label: device.label || `Microfone ${index + 1}`,
+          ...(device.groupId ? { groupId: device.groupId } : {}),
+        }))
     );
   }, []);
 

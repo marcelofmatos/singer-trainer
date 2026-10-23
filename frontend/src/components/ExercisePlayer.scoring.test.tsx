@@ -5,7 +5,15 @@ import type { Exercise } from '../lib/exercises';
 import type { PitchTrackerState } from '../hooks/usePitchTracker';
 
 const tracker: { state: PitchTrackerState } = {
-  state: { status: 'listening', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null },
+  state: {
+    status: 'listening',
+    errorMessage: null,
+    currentNote: null,
+    waveform: [],
+    deviceName: null,
+    deviceId: null,
+    groupId: null,
+  },
 };
 
 // InputLane calls usePitchTracker(sensitivity, enabled, deviceId, options); every lane gets the same state.
@@ -96,6 +104,13 @@ describe('ExercisePlayer scoring', () => {
     expect(history[0].hitSeconds / history[0].targetSeconds).toBeCloseTo(1);
     expect(screen.getByTestId('score-session-percent-primary').textContent).toBe('100%');
     expect(screen.getByTestId('score-overall-percent-primary').textContent).toBe('100%');
+  });
+
+  it('counts the sample taken in the same tick the pass ends', () => {
+    tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 4, midiNumber: 60, cents: 0 } };
+    renderPlayer();
+    advance(1200);
+    expect(savedHistory()[0].targetSeconds).toBeCloseTo(1, 1);
   });
 
   it('counts silence as a miss', () => {

@@ -330,8 +330,8 @@ describe('ExercisePlayer microphone picker', () => {
       { deviceId: 'default', label: 'Padrão', kind: 'audioinput' },
       { deviceId: 'usb', label: 'USB Mic', kind: 'audioinput' },
     ];
-    getUserMedia = vi.fn(async (constraints: { audio: true | { deviceId: { exact: string } } }) => {
-      const deviceId = constraints.audio === true ? 'default' : constraints.audio.deviceId.exact;
+    getUserMedia = vi.fn(async (constraints: { audio: { deviceId?: { exact: string } } }) => {
+      const deviceId = constraints.audio.deviceId?.exact ?? 'default';
       const track = {
         stop: vi.fn(),
         label: devices.find((device) => device.deviceId === deviceId)?.label ?? '',
@@ -375,7 +375,7 @@ describe('ExercisePlayer microphone picker', () => {
     await flush();
     fireEvent.change(screen.getByRole('combobox', { name: 'Microfone' }), { target: { value: 'usb' } });
     await flush();
-    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: expect.objectContaining({ deviceId: { exact: 'usb' } }) });
     expect(localStorage.getItem('singer-trainer:mic-device-id')).toBe('usb');
     expect((screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement).value).toBe('usb');
   });
@@ -397,7 +397,7 @@ describe('ExercisePlayer microphone picker', () => {
     localStorage.setItem('singer-trainer:mic-device-id', 'usb');
     renderPlayer();
     await flush();
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: expect.objectContaining({ deviceId: { exact: 'usb' } }) });
   });
 
   it('shows a newly enabled microphone after pressing the refresh button', async () => {

@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createLaneId, loadInputLanes, nextFreeDeviceId, PRIMARY_LANE_ID, saveInputLanes } from './inputLanes';
+import {
+  createLaneId,
+  findRealInput,
+  loadInputLanes,
+  nextFreeDeviceId,
+  PRIMARY_LANE_ID,
+  saveInputLanes,
+} from './inputLanes';
 
 const LANES_KEY = 'singer-trainer:input-lanes';
 const MIC_KEY = 'singer-trainer:mic-device-id';
@@ -76,6 +83,37 @@ describe('inputLanes', () => {
       { id: 'lane-2', deviceId: 'monitor' },
     ];
     expect(nextFreeDeviceId(lanes, available, ['usb'])).toBeNull();
+  });
+
+  it('skips devices in the same group as one already in use (Chrome reports the "default" alias)', () => {
+    const lanes = [{ id: PRIMARY_LANE_ID, deviceId: null }];
+    const available = [
+      { deviceId: 'default', label: 'Padrão', groupId: 'g-usb' },
+      { deviceId: 'usb', label: 'USB Mic', groupId: 'g-usb' },
+      { deviceId: 'monitor', label: 'Monitor of JBL', groupId: 'g-jbl' },
+    ];
+    expect(nextFreeDeviceId(lanes, available, ['default'], ['g-usb'])).toBe('monitor');
+  });
+
+  it("skips devices in the same group as a lane's configured device", () => {
+    const lanes = [{ id: PRIMARY_LANE_ID, deviceId: 'usb-alias' }];
+    const available = [
+      { deviceId: 'usb-alias', label: 'USB (alias)', groupId: 'g-usb' },
+      { deviceId: 'usb', label: 'USB Mic', groupId: 'g-usb' },
+      { deviceId: 'monitor', label: 'Monitor of JBL', groupId: 'g-jbl' },
+    ];
+    expect(nextFreeDeviceId(lanes, available)).toBe('monitor');
+  });
+
+  it('finds the real device behind an id or group in use', () => {
+    const available = [
+      { deviceId: 'default', label: 'Padrão', groupId: 'g-usb' },
+      { deviceId: 'usb', label: 'USB Mic', groupId: 'g-usb' },
+    ];
+    expect(findRealInput(available, 'usb', null)?.label).toBe('USB Mic');
+    expect(findRealInput(available, 'default', 'g-usb')?.label).toBe('USB Mic');
+    expect(findRealInput(available, 'default', null)).toBeUndefined();
+    expect(findRealInput(available, null, null)).toBeUndefined();
   });
 
   it('creates distinct lane ids', () => {

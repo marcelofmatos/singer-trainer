@@ -7,6 +7,8 @@ let stopSpies: ReturnType<typeof vi.fn>[] = [];
 let getUserMedia: ReturnType<typeof vi.fn>;
 let trackLabel = 'USB Audio Device';
 let endedListeners: Array<() => void> = [];
+// Pitch detection wants the raw signal, without the browser's voice-call processing.
+const RAW_AUDIO = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
 
 class MockAudioContext {
   sampleRate = 44100;
@@ -26,14 +28,14 @@ describe('usePitchTracker', () => {
     stopSpies = [];
     trackLabel = 'USB Audio Device';
     endedListeners = [];
-    getUserMedia = vi.fn(async (constraints: { audio: true | { deviceId: { exact: string } } }) => {
+    getUserMedia = vi.fn(async (constraints: { audio: { deviceId?: { exact: string } } }) => {
       const stop = vi.fn();
       stopSpies.push(stop);
-      const deviceId = constraints.audio === true ? 'default' : constraints.audio.deviceId.exact;
+      const deviceId = constraints.audio.deviceId?.exact ?? 'default';
       const track = {
         stop,
         label: trackLabel,
-        getSettings: () => ({ deviceId }),
+        getSettings: () => ({ deviceId, groupId: `g-${deviceId}` }),
         addEventListener: (type: string, listener: () => void) => {
           if (type === 'ended') endedListeners.push(listener);
         },
@@ -55,7 +57,7 @@ describe('usePitchTracker', () => {
     const { result } = renderHook(() => usePitchTracker(0.15, true));
     await waitFor(() => expect(result.current.status).toBe('listening'));
     expect(getUserMedia).toHaveBeenCalledTimes(1);
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: RAW_AUDIO });
   });
 
   it('does not open the microphone and reports "off" when disabled', () => {
@@ -106,8 +108,9 @@ describe('usePitchTracker', () => {
   it('opens the requested microphone and reports the device in use', async () => {
     const { result } = renderHook(() => usePitchTracker(0.15, true, 'usb'));
     await waitFor(() => expect(result.current.status).toBe('listening'));
-    expect(getUserMedia).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'usb' } } });
+    expect(getUserMedia).toHaveBeenCalledWith({ audio: { ...RAW_AUDIO, deviceId: { exact: 'usb' } } });
     expect(result.current.deviceId).toBe('usb');
+    expect(result.current.groupId).toBe('g-usb');
   });
 
   it('reports a disconnected input instead of falling back when asked not to', async () => {
@@ -122,7 +125,7 @@ describe('usePitchTracker', () => {
     getUserMedia.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'OverconstrainedError' }));
     const { result } = renderHook(() => usePitchTracker(0.15, true, 'unplugged'));
     await waitFor(() => expect(result.current.status).toBe('listening'));
-    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: true });
+    expect(getUserMedia).toHaveBeenLastCalledWith({ audio: RAW_AUDIO });
     expect(result.current.deviceId).toBe('default');
   });
 
@@ -132,6 +135,17 @@ describe('usePitchTracker', () => {
     await waitFor(() => expect(result.current.status).toBe('error'));
     expect(getUserMedia).toHaveBeenCalledTimes(1);
     expect(result.current.deviceId).toBeNull();
+    expect(result.current.groupId).toBeNull();
+  });
+
+  it('reports no group when the browser does not give one', async () => {
+    getUserMedia.mockResolvedValueOnce({
+      getTracks: () => [],
+      getAudioTracks: () => [{ stop() {}, label: '', getSettings: () => ({ deviceId: 'usb' }), addEventListener() {} }],
+    });
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'usb'));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(result.current.groupId).toBeNull();
   });
 
   it('reopens the microphone when switching devices', async () => {

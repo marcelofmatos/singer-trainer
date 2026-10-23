@@ -6,7 +6,15 @@ import type { PitchTrackerState } from '../hooks/usePitchTracker';
 
 const trackerCalls: unknown[][] = [];
 const tracker: { state: PitchTrackerState } = {
-  state: { status: 'listening', errorMessage: null, currentNote: null, waveform: [], deviceName: 'USB', deviceId: 'usb' },
+  state: {
+    status: 'listening',
+    errorMessage: null,
+    currentNote: null,
+    waveform: [],
+    deviceName: 'USB',
+    deviceId: 'usb',
+    groupId: 'g-usb',
+  },
 };
 
 vi.mock('../hooks/usePitchTracker', () => ({
@@ -45,7 +53,14 @@ function renderLane(overrides: Partial<InputLaneProps> = {}) {
 describe('InputLane', () => {
   beforeEach(() => {
     trackerCalls.length = 0;
-    tracker.state = { ...tracker.state, status: 'listening', currentNote: null, errorMessage: null, deviceId: 'usb' };
+    tracker.state = {
+      ...tracker.state,
+      status: 'listening',
+      currentNote: null,
+      errorMessage: null,
+      deviceId: 'usb',
+      groupId: 'g-usb',
+    };
     vi.useFakeTimers();
   });
 
@@ -130,7 +145,7 @@ describe('InputLane', () => {
 
   it('reports the device its tracker actually opened', () => {
     const props = renderLane({ lane: { id: 'primary', deviceId: null } });
-    expect(props.onDeviceInUse).toHaveBeenLastCalledWith('primary', 'usb');
+    expect(props.onDeviceInUse).toHaveBeenLastCalledWith('primary', 'usb', 'g-usb');
   });
 
   it('asks for a device, without opening one, when a non-primary lane has none', () => {
@@ -142,6 +157,13 @@ describe('InputLane', () => {
     expect(select.selectedOptions[0].textContent).toBe('Escolha um dispositivo');
     expect(select.selectedOptions[0].disabled).toBe(true);
     expect(screen.queryByText('Mic desativado')).toBeNull();
+  });
+
+  it('asks for a device in a status line when a lane has none and no inputs are listed', () => {
+    tracker.state = { ...tracker.state, status: 'off', deviceId: null, groupId: null };
+    renderLane({ lane: { id: 'lane-2', deviceId: null }, position: 2, onRemove: vi.fn(), audioInputs: [] });
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(screen.getByText('Escolha um dispositivo')).toBeDefined();
   });
 
   it('shows "Mic desativado" when off', () => {

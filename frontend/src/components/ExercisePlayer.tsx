@@ -8,6 +8,7 @@ import { playPreviewTone } from '../audio/previewTone';
 import { useAudioInputs } from '../hooks/useAudioInputs';
 import {
   createLaneId,
+  findRealInput,
   loadInputLanes,
   nextFreeDeviceId,
   PRIMARY_LANE_ID,
@@ -71,7 +72,9 @@ export function ExercisePlayer({
   const [lanes, setLanes] = useState<InputLaneConfig[]>(() => loadInputLanes());
   const [micOff, setMicOff] = useState<Record<string, boolean>>({});
   // The device each lane's tracker actually opened (the primary lane on the system default has deviceId null).
-  const [devicesInUse, setDevicesInUse] = useState<Record<string, string | null>>({});
+  const [devicesInUse, setDevicesInUse] = useState<
+    Record<string, { deviceId: string | null; groupId: string | null }>
+  >({});
   const [passTallies, setPassTallies] = useState<Record<string, ScoreTally>>({});
   // Mirrors passTallies synchronously: a lane may sample in the same tick the pass ends, before
   // a re-render, and that sample must still be counted in the pass being completed.
@@ -179,30 +182,47 @@ export function ExercisePlayer({
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
+  // A lane on the system default (or an alias like "default") is named after the real device it opened.
   function laneLabel(lane: InputLaneConfig, position: number): string {
-    const device = audioInputs.inputs.find((input) => input.deviceId === lane.deviceId);
+    const inputs = audioInputs.inputs;
+    const inUse = devicesInUse[lane.id];
+    const device =
+      findRealInput(inputs, lane.deviceId, null) ??
+      findRealInput(inputs, inUse?.deviceId ?? null, inUse?.groupId ?? null) ??
+      inputs.find((input) => input.deviceId === lane.deviceId);
     return device?.label ?? (lane.id === PRIMARY_LANE_ID ? 'Microfone' : `Entrada ${position}`);
   }
 
   function addLane() {
-    const inUse = Object.values(devicesInUse).filter((deviceId): deviceId is string => deviceId !== null);
+    const inUse = Object.values(devicesInUse);
+    const inUseDeviceIds = inUse.flatMap(({ deviceId }) => (deviceId ? [deviceId] : []));
+    const inUseGroupIds = inUse.flatMap(({ groupId }) => (groupId ? [groupId] : []));
     setLanes((current) => [
       ...current,
-      { id: createLaneId(), deviceId: nextFreeDeviceId(current, audioInputs.inputs, inUse) },
+      { id: createLaneId(), deviceId: nextFreeDeviceId(current, audioInputs.inputs, inUseDeviceIds, inUseGroupIds) },
     ]);
+  }
+
+  function withoutLane<T>(record: Record<string, T>, laneId: string): Record<string, T> {
+    const next = { ...record };
+    delete next[laneId];
+    return next;
   }
 
   function removeLane(laneId: string) {
     setLanes((current) => current.filter((lane) => lane.id !== laneId));
-    setDevicesInUse((current) => {
-      const next = { ...current };
-      delete next[laneId];
-      return next;
-    });
+    setDevicesInUse((current) => withoutLane(current, laneId));
+    // Its unfinished pass goes too, so it can't leak into the session totals.
+    passTalliesRef.current = withoutLane(passTalliesRef.current, laneId);
+    setPassTallies(passTalliesRef.current);
   }
 
-  const handleDeviceInUse = useCallback((laneId: string, deviceId: string | null) => {
-    setDevicesInUse((current) => (current[laneId] === deviceId ? current : { ...current, [laneId]: deviceId }));
+  const handleDeviceInUse = useCallback((laneId: string, deviceId: string | null, groupId: string | null) => {
+    setDevicesInUse((current) =>
+      current[laneId]?.deviceId === deviceId && current[laneId]?.groupId === groupId
+        ? current
+        : { ...current, [laneId]: { deviceId, groupId } }
+    );
   }, []);
 
   function selectLaneDevice(laneId: string, deviceId: string) {

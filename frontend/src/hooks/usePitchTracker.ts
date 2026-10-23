@@ -15,6 +15,8 @@ export interface PitchTrackerState {
   deviceName: string | null;
   /** deviceId of the microphone actually in use while listening; null otherwise. */
   deviceId: string | null;
+  /** groupId of that microphone (shared by aliases such as "default"); null when unknown. */
+  groupId: string | null;
 }
 
 const BUFFER_SIZE = 4096;
@@ -22,6 +24,8 @@ const DETECTION_INTERVAL_MS = 50; // naive YIN is O(n^2); 20Hz updates keep CPU 
 const POINTS_PER_TICK = 8;
 const WINDOW_SECONDS = 4;
 const WINDOW_POINTS = (WINDOW_SECONDS * 1000 / DETECTION_INTERVAL_MS) * POINTS_PER_TICK; // 640
+// Echo cancellation, noise suppression and auto gain are tuned for calls and distort pitch.
+const RAW_AUDIO = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
 
 /**
  * Listens to the microphone and reports the detected note and a rolling waveform buffer
@@ -49,6 +53,7 @@ export function usePitchTracker(
     waveform: [],
     deviceName: null,
     deviceId: null,
+    groupId: null,
   });
 
   const sensitivityRef = useRef(sensitivity);
@@ -61,10 +66,26 @@ export function usePitchTracker(
 
   useEffect(() => {
     if (!enabled) {
-      setState({ status: 'off', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null });
+      setState({
+        status: 'off',
+        errorMessage: null,
+        currentNote: null,
+        waveform: [],
+        deviceName: null,
+        deviceId: null,
+        groupId: null,
+      });
       return;
     }
-    setState({ status: 'requesting', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null });
+    setState({
+      status: 'requesting',
+      errorMessage: null,
+      currentNote: null,
+      waveform: [],
+      deviceName: null,
+      deviceId: null,
+      groupId: null,
+    });
 
     let cancelled = false;
     let stream: MediaStream | null = null;
@@ -72,13 +93,13 @@ export function usePitchTracker(
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     function openStream(): Promise<MediaStream> {
-      if (!deviceId) return navigator.mediaDevices.getUserMedia({ audio: true });
-      return navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } }).catch((err) => {
+      if (!deviceId) return navigator.mediaDevices.getUserMedia({ audio: RAW_AUDIO });
+      return navigator.mediaDevices.getUserMedia({ audio: { ...RAW_AUDIO, deviceId: { exact: deviceId } } }).catch((err) => {
         // The chosen microphone isn't connected — fall back to the system default.
         const name = (err as { name?: string } | null)?.name;
         if (name === 'OverconstrainedError' || name === 'NotFoundError') {
           if (!fallbackToDefault) throw new Error('Entrada desconectada');
-          return navigator.mediaDevices.getUserMedia({ audio: true });
+          return navigator.mediaDevices.getUserMedia({ audio: RAW_AUDIO });
         }
         throw err;
       });
@@ -101,11 +122,13 @@ export function usePitchTracker(
         const buffer = new Float32Array(analyser.fftSize);
         const track = stream.getAudioTracks()[0];
         const deviceName = track?.label || null;
-        const activeDeviceId = track?.getSettings?.().deviceId ?? null;
+        const settings = track?.getSettings?.();
+        const activeDeviceId = settings?.deviceId ?? null;
+        const activeGroupId = settings?.groupId ?? null;
         track?.addEventListener('ended', () => {
           if (!cancelled) setReopenCount((count) => count + 1);
         });
-        setState((prev) => ({ ...prev, status: 'listening', deviceName, deviceId: activeDeviceId }));
+        setState((prev) => ({ ...prev, status: 'listening', deviceName, deviceId: activeDeviceId, groupId: activeGroupId }));
 
         intervalId = setInterval(() => {
           analyser.getFloatTimeDomainData(buffer);
@@ -126,6 +149,7 @@ export function usePitchTracker(
             waveform: [],
             deviceName: null,
             deviceId: null,
+            groupId: null,
           });
         }
       }
