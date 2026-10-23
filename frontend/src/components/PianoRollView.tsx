@@ -47,18 +47,23 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
   const x = (time: number) => LABEL_WIDTH + ((time - (now - WINDOW_MS)) / WINDOW_MS) * (WIDTH - LABEL_WIDTH);
   const y = (midi: number) => (high - midi) * rowHeight + rowHeight / 2;
 
-  // Consecutive samples with the same target form one bar; voice segments break on silence.
+  const isVisible = (entry: RollSample) => entry.voice !== null && entry.voice >= low && entry.voice <= high;
+
+  // Consecutive samples with the same target form one bar; voice runs break on silence, out-of-range pitches and status changes.
   const targetBars: { start: number; end: number; midi: number }[] = [];
-  const voiceSegments: RollSample[][] = [];
+  const voiceRuns: RollSample[][] = []; // consecutive in-range samples with one status
   samples.forEach((entry, index) => {
     if (entry.target !== null) {
       const last = targetBars[targetBars.length - 1];
       if (last && last.midi === entry.target && samples[index - 1]?.target === entry.target) last.end = entry.time;
       else targetBars.push({ start: entry.time, end: entry.time, midi: entry.target });
     }
-    if (entry.voice !== null) {
-      if (index > 0 && samples[index - 1].voice !== null) voiceSegments[voiceSegments.length - 1].push(entry);
-      else voiceSegments.push([entry]);
+    if (isVisible(entry)) {
+      const previous = samples[index - 1];
+      const run = voiceRuns[voiceRuns.length - 1];
+      if (previous && isVisible(previous) && previous.status === entry.status) run.push(entry);
+      else if (previous && isVisible(previous)) voiceRuns.push([previous, entry]); // repeat the boundary point: no gap
+      else voiceRuns.push([entry]);
     }
   });
 
@@ -102,29 +107,33 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
           strokeWidth={1}
         />
       ))}
-      {voiceSegments.map((segment) =>
-        segment.length === 1 ? (
+      {voiceRuns.map((run) => {
+        const status = run[run.length - 1].status;
+        const color = status ? STATUS_COLORS[status] : '#ffffff';
+        return run.length === 1 ? (
           <circle
-            key={segment[0].time}
+            key={run[0].time}
             data-testid="roll-voice"
-            cx={x(segment[0].time)}
-            cy={y(segment[0].voice!)}
+            data-status={status ?? undefined}
+            cx={x(run[0].time)}
+            cy={y(run[0].voice!)}
             r={2}
-            fill={segment[0].status ? STATUS_COLORS[segment[0].status] : '#ffffff'}
+            fill={color}
           />
         ) : (
           <polyline
-            key={segment[0].time}
+            key={run[0].time}
             data-testid="roll-voice"
-            points={segment.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}
+            data-status={status ?? undefined}
+            points={run.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}
             fill="none"
-            stroke={segment[segment.length - 1].status ? STATUS_COLORS[segment[segment.length - 1].status!] : '#ffffff'}
+            stroke={color}
             strokeWidth={2.5}
             strokeLinejoin="round"
             strokeLinecap="round"
           />
-        )
-      )}
+        );
+      })}
     </svg>
   );
 }
