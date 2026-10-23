@@ -35,6 +35,40 @@ describe('inputLanes', () => {
     expect(localStorage.getItem(MIC_KEY)).toBe('usb');
   });
 
+  it('round-trips a lane latency', () => {
+    const lanes = [
+      { id: PRIMARY_LANE_ID, deviceId: 'usb', latencyMs: 180 },
+      { id: 'lane-2', deviceId: null },
+    ];
+    saveInputLanes(lanes);
+    expect(loadInputLanes()).toEqual(lanes);
+  });
+
+  it('loads lanes stored without latencyMs unchanged', () => {
+    localStorage.setItem(LANES_KEY, JSON.stringify([{ id: PRIMARY_LANE_ID, deviceId: 'usb' }]));
+    expect(loadInputLanes()).toEqual([{ id: PRIMARY_LANE_ID, deviceId: 'usb' }]);
+  });
+
+  it('drops an invalid latencyMs but still loads the lane', () => {
+    localStorage.setItem(
+      LANES_KEY,
+      JSON.stringify([
+        { id: PRIMARY_LANE_ID, deviceId: 'usb', latencyMs: 5000 },
+        { id: 'a', deviceId: null, latencyMs: 'x' },
+        { id: 'b', deviceId: null, latencyMs: -1 },
+        { id: 'c', deviceId: null, latencyMs: null },
+        { id: 'd', deviceId: null, latencyMs: 1000 },
+      ])
+    );
+    expect(loadInputLanes()).toEqual([
+      { id: PRIMARY_LANE_ID, deviceId: 'usb' },
+      { id: 'a', deviceId: null },
+      { id: 'b', deviceId: null },
+      { id: 'c', deviceId: null },
+      { id: 'd', deviceId: null, latencyMs: 1000 },
+    ]);
+  });
+
   it('falls back to a single primary lane when the stored value is invalid', () => {
     localStorage.setItem(LANES_KEY, '{bad');
     expect(loadInputLanes()).toEqual([{ id: PRIMARY_LANE_ID, deviceId: null }]);

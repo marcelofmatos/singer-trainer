@@ -1,4 +1,5 @@
 import type { AudioInput } from '../hooks/useAudioInputs';
+import { MAX_LATENCY_MS } from './latency';
 import { loadMicDeviceId, saveMicDeviceId } from './micPreference';
 
 const STORAGE_KEY = 'singer-trainer:input-lanes';
@@ -8,6 +9,8 @@ export const PRIMARY_LANE_ID = 'primary';
 export interface InputLaneConfig {
   id: string;
   deviceId: string | null;
+  /** Input delay in ms (0-1000); absent means 0. */
+  latencyMs?: number;
 }
 
 function isLane(value: unknown): value is InputLaneConfig {
@@ -16,12 +19,19 @@ function isLane(value: unknown): value is InputLaneConfig {
   return typeof lane.id === 'string' && (typeof lane.deviceId === 'string' || lane.deviceId === null);
 }
 
+/** Lenient: an invalid latencyMs is dropped (treated as 0) instead of rejecting the lane. */
+function withValidLatency(lane: InputLaneConfig): InputLaneConfig {
+  const { latencyMs, ...rest } = lane;
+  const valid = typeof latencyMs === 'number' && Number.isFinite(latencyMs) && latencyMs >= 0 && latencyMs <= MAX_LATENCY_MS;
+  return valid ? lane : rest;
+}
+
 /** Stored lanes, always starting with the primary one; migrates from the single saved mic. */
 export function loadInputLanes(): InputLaneConfig[] {
   try {
     const parsed: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     if (Array.isArray(parsed) && parsed.every(isLane) && parsed[0]?.id === PRIMARY_LANE_ID) {
-      return parsed;
+      return parsed.map(withValidLatency);
     }
   } catch {
     // Fall through to the default below.
