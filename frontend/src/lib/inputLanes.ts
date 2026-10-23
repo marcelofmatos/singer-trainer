@@ -71,10 +71,13 @@ export function nextFreeDeviceId(
   for (const input of available) {
     if (input.groupId && usedIds.has(input.deviceId)) usedGroups.add(input.groupId);
   }
-  const free = available.find(
+  const candidates = available.filter(
     (input) =>
       isRealInput(input) && !usedIds.has(input.deviceId) && !(input.groupId && usedGroups.has(input.groupId))
   );
+  // System monitors first: they're what extra lanes are for, and auto-picking a Bluetooth headset's mic
+  // switches the headset to call mode, which on Linux can stall its audio output until it's reconnected.
+  const free = candidates.find((input) => input.label.startsWith('Monitor of')) ?? candidates[0];
   return free?.deviceId ?? null;
 }
 

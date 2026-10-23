@@ -86,6 +86,24 @@ describe('inputLanes', () => {
     expect(nextFreeDeviceId([...lanes, { id: 'b', deviceId: 'monitor' }], available)).toBeNull();
   });
 
+  it('prefers a free "Monitor of" device over other microphones (e.g. a Bluetooth headset mic)', () => {
+    const lanes = [{ id: PRIMARY_LANE_ID, deviceId: 'usb' }];
+    const available = [
+      { deviceId: 'usb', label: 'USB Composite Device Mono' },
+      { deviceId: 'jbl-mic', label: 'JBL Tune 770NC' },
+      { deviceId: 'analog-monitor', label: 'Monitor of Áudio interno Estéreo analógico' },
+      { deviceId: 'jbl-monitor', label: 'Monitor of JBL Tune 770NC' },
+    ];
+    expect(nextFreeDeviceId(lanes, available)).toBe('analog-monitor');
+    expect(nextFreeDeviceId([...lanes, { id: 'b', deviceId: 'analog-monitor' }], available)).toBe('jbl-monitor');
+    expect(
+      nextFreeDeviceId(
+        [...lanes, { id: 'b', deviceId: 'analog-monitor' }, { id: 'c', deviceId: 'jbl-monitor' }],
+        available
+      )
+    ).toBe('jbl-mic');
+  });
+
   it('never picks the pseudo devices "default" and "communications"', () => {
     const available = [
       { deviceId: 'default', label: 'Padrão' },
