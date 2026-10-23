@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CHROMATIC_NOTE_COLORS, pitchClassIndex } from '../lib/chromaticWheel';
+import { CHROMATIC_NOTE_COLORS, pitchClassIndex, readableTextColor } from '../lib/chromaticWheel';
 import { appendSample, pitchRange, type RollSample } from '../lib/pianoRoll';
 import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
@@ -19,8 +19,6 @@ const HEIGHT = 260;
 const LABEL_WIDTH = 34;
 const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
 const LABEL_FONT_SIZE = 11;
-// Rows are tinted with each note's wheel color, faint enough to keep the voice line and target bars readable.
-const ROW_TINT_OPACITY = 0.14;
 
 /**
  * Rows to label at a fixed font size without labels touching: Cs first (an octave apart, so they always fit),
@@ -104,16 +102,24 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
               y={y(midi) - rowHeight / 2}
               width={WIDTH - LABEL_WIDTH}
               height={rowHeight}
+              fill={BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 'rgba(255,255,255,0.03)' : 'transparent'}
+            />
+            <rect
+              data-testid={`roll-legend-${midi}`}
+              x={0}
+              y={y(midi) - rowHeight / 2}
+              width={LABEL_WIDTH}
+              height={rowHeight}
               fill={CHROMATIC_NOTE_COLORS[pitchClassIndex(midi)]}
-              fillOpacity={ROW_TINT_OPACITY}
             />
             {labeled.has(midi) && (
               <text
-                x={2}
+                x={3}
                 y={y(midi)}
                 dominantBaseline="central"
                 fontSize={LABEL_FONT_SIZE}
-                fill={pitchClassIndex(midi) === 0 ? 'var(--color-text)' : 'var(--color-text-muted)'}
+                fontWeight={pitchClassIndex(midi) === 0 ? 700 : 500}
+                fill={readableTextColor(CHROMATIC_NOTE_COLORS[pitchClassIndex(midi)])}
               >
                 {noteLabel(midi)}
               </text>

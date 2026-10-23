@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { PianoRollView } from './PianoRollView';
-import { CHROMATIC_NOTE_COLORS } from '../lib/chromaticWheel';
+import { CHROMATIC_NOTE_COLORS, readableTextColor } from '../lib/chromaticWheel';
 
 const note = (midiNumber: number, cents: number) => ({ noteName: 'X', octave: 0, midiNumber, cents });
 
@@ -93,13 +93,21 @@ describe('PianoRollView', () => {
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
   });
 
-  it('tints each row with the note color from the wheel', () => {
+  it('colors the legend cell of each row with the note color from the wheel, not the chart', () => {
     const { container } = render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
-    const row = (midi: number) => container.querySelector(`[data-testid="roll-row-${midi}"]`)!;
-    expect(row(60).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[0]);
-    expect(row(61).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[1]);
-    expect(row(69).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[9]);
-    expect(Number(row(60).getAttribute('fill-opacity'))).toBeLessThanOrEqual(0.2);
+    const legend = (midi: number) => container.querySelector(`[data-testid="roll-legend-${midi}"]`)!;
+    expect(legend(60).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[0]);
+    expect(legend(61).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[1]);
+    expect(legend(69).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[9]);
+    expect(Number(legend(60).getAttribute('x'))).toBe(0);
+    const chartRow = container.querySelector('[data-testid="roll-row-60"]')!;
+    expect(chartRow.getAttribute('fill')).not.toBe(CHROMATIC_NOTE_COLORS[0]);
+  });
+
+  it('writes each legend label in a color readable on its note color', () => {
+    render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    expect(screen.getByText('C4').getAttribute('fill')).toBe(readableTextColor(CHROMATIC_NOTE_COLORS[0]));
+    expect(screen.getByText('G#4').getAttribute('fill')).toBe(readableTextColor(CHROMATIC_NOTE_COLORS[8]));
   });
 
   it('labels every semitone row when there is room', () => {
