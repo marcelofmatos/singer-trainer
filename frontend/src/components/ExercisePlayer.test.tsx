@@ -408,12 +408,12 @@ describe('ExercisePlayer microphone picker', () => {
     expect(screen.getByRole('option', { name: 'Headset' })).toBeDefined();
   });
 
-  it('replaces the picker with "Mic desativado" when the microphone is off', async () => {
+  it('keeps the picker in the lane header and shows "Mic desativado" when the microphone is off', async () => {
     renderPlayer();
     await flush();
     press('m');
     await flush();
-    expect(screen.queryByRole('combobox', { name: 'Microfone' })).toBeNull();
+    expect(screen.getByRole('combobox', { name: 'Microfone' })).toBeDefined();
     expect(screen.getByText('Mic desativado')).toBeDefined();
   });
 });

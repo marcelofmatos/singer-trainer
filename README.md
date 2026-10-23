@@ -31,10 +31,11 @@ quão perto você está da nota certa.
   cents da nota-alvo, em qualquer oitava) e a % de acerto da sessão e geral; cada passada
   completa é gravada no navegador, e o painel de histórico (clique no placar ou H) mostra
   os recordes por exercício e as últimas passadas.
-- **Seletor de microfone** — dropdown com os microfones do sistema no lugar do nome do
-  mic; a escolha fica salva, a lista se atualiza ao conectar/desconectar (ou no botão 🔄)
-  e, se o mic escolhido sumir, o app volta para o padrão do sistema. Com o mic desligado
-  (botão 🎙️ ou M) aparece "Mic desativado".
+- **Várias entradas** — cada entrada de áudio vira uma faixa com a própria roda, onda e
+  pontuação: adicione o seu microfone, o "Monitor of …" do sistema (para captar a voz de
+  um vídeo tocando em outra aba) ou outro mic, com "+ Adicionar entrada". Cada faixa tem
+  seletor de dispositivo e liga/desliga; a montagem fica salva, e uma entrada
+  desconectada aparece como tal até voltar.
 
 ## Rodando localmente
 
@@ -83,9 +84,9 @@ num diretório de infraestrutura separado.
 
 ```mermaid
 flowchart LR
-  User["Usuário"] -->|voz| Mic["Microfone<br/>getUserMedia / enumerateDevices"]
+  User["Usuário"] -->|voz| Mic["Entradas de áudio<br/>getUserMedia / enumerateDevices"]
   User -->|teclado / mouse| UI["App + ExercisePlayer"]
-  Mic --> Tracker["usePitchTracker<br/>YIN no navegador"]
+  Mic --> Tracker["usePitchTracker por faixa<br/>YIN no navegador"]
   Tracker -->|nota + forma de onda| UI
   UI --> Wheel["PitchMeter<br/>roda cromática"]
   UI --> Wave["Waveform"]

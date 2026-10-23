@@ -1,22 +1,27 @@
 // frontend/src/components/ExercisePlayer.tsx
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
 import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
 import { playExerciseTone, REFERENCE_TONE_GAIN } from '../audio/referenceTone';
 import { playPreviewTone } from '../audio/previewTone';
-import { usePitchTracker } from '../hooks/usePitchTracker';
-import { loadMicDeviceId, saveMicDeviceId } from '../lib/micPreference';
 import { useAudioInputs } from '../hooks/useAudioInputs';
+import {
+  createLaneId,
+  loadInputLanes,
+  nextFreeDeviceId,
+  PRIMARY_LANE_ID,
+  saveInputLanes,
+  type InputLaneConfig,
+} from '../lib/inputLanes';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
-import { addSample, addTallies, EMPTY_TALLY, isHit, type ScoreTally } from '../lib/scoring';
-import { appendScoreRecord, loadScoreHistory, totalTally } from '../lib/scoreHistory';
-import type { NoteInfo } from '../lib/noteUtils';
+import { addSample, addTallies, EMPTY_TALLY, type ScoreTally } from '../lib/scoring';
+import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
+import { InputLane } from './InputLane';
 import { KeyboardHelp } from './KeyboardHelp';
-import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
+import { type PitchMeterHandle } from './PitchMeter';
 import { ScoreBoard } from './ScoreBoard';
 import { ScoreHistory } from './ScoreHistory';
-import { Waveform } from './Waveform';
 
 export interface ExercisePlayerProps {
   exercise: Exercise;
@@ -42,7 +47,8 @@ const REPEATABLE_ACTIONS: ShortcutAction[] = [
 // The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
 const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
-const SCORE_TICK_MS = 100;
+// Seconds each lane sample stands for; must match InputLane's 100ms scoring tick.
+const SAMPLE_SECONDS = 0.1;
 
 export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
@@ -54,18 +60,21 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   const [playing, setPlaying] = useState(true);
   const [ended, setEnded] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [micEnabled, setMicEnabled] = useState(true);
   const [helpOpen, setHelpOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [passTally, setPassTally] = useState<ScoreTally>(EMPTY_TALLY);
-  const [sessionTally, setSessionTally] = useState<ScoreTally>(EMPTY_TALLY);
+  const [lanes, setLanes] = useState<InputLaneConfig[]>(() => loadInputLanes());
+  const [micOff, setMicOff] = useState<Record<string, boolean>>({});
+  const [passTallies, setPassTallies] = useState<Record<string, ScoreTally>>({});
+  // Mirrors passTallies synchronously: a lane may sample in the same tick the pass ends, before
+  // a re-render, and that sample must still be counted in the pass being completed.
+  const passTalliesRef = useRef<Record<string, ScoreTally>>({});
+  const [sessionTallies, setSessionTallies] = useState<Record<string, ScoreTally>>({});
   const [history, setHistory] = useState(() => loadScoreHistory());
-  const historyTally = useMemo(() => totalTally(history), [history]);
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
-  const [preferredMicId, setPreferredMicId] = useState(() => loadMicDeviceId());
-  const pitchTracker = usePitchTracker(micSensitivity, micEnabled, preferredMicId);
-  const audioInputs = useAudioInputs(pitchTracker.deviceId);
+  const audioInputs = useAudioInputs(null);
+
+  useEffect(() => saveInputLanes(lanes), [lanes]);
 
   // Read via refs inside the effect below so toggling these controls mid-playback
   // doesn't restart the currently-playing cycle from scratch.
@@ -127,7 +136,8 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       setToneError(null);
       setElapsed(0);
       setEnded(false);
-      setPassTally(EMPTY_TALLY);
+      passTalliesRef.current = {};
+      setPassTallies({});
 
       pollTimer = setInterval(() => {
         if (!audioContext) return;
@@ -161,46 +171,62 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
-  // Scoring samples on its own 100ms tick from refs, so it reads the latest pitch and target
-  // without re-arming the interval on every detection update.
-  const scoringRef = useRef<{ active: boolean; targetMidi: number | null; detected: NoteInfo | null }>({
-    active: false,
-    targetMidi: null,
-    detected: null,
-  });
-  useEffect(() => {
-    scoringRef.current = {
-      active: playing && !ended && pitchTracker.status === 'listening',
-      targetMidi: targetNote?.midiNumber ?? null,
-      detected: pitchTracker.currentNote,
-    };
-  });
+  function laneLabel(lane: InputLaneConfig, position: number): string {
+    const device = audioInputs.inputs.find((input) => input.deviceId === lane.deviceId);
+    return device?.label ?? (lane.id === PRIMARY_LANE_ID ? 'Microfone' : `Entrada ${position}`);
+  }
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      const { active, targetMidi, detected } = scoringRef.current;
-      if (!active || targetMidi === null) return;
-      setPassTally((tally) => addSample(tally, SCORE_TICK_MS / 1000, isHit(detected, targetMidi)));
-    }, SCORE_TICK_MS);
-    return () => clearInterval(intervalId);
+  function addLane() {
+    setLanes((current) => [...current, { id: createLaneId(), deviceId: nextFreeDeviceId(current, audioInputs.inputs) }]);
+  }
+
+  function removeLane(laneId: string) {
+    setLanes((current) => current.filter((lane) => lane.id !== laneId));
+  }
+
+  function selectLaneDevice(laneId: string, deviceId: string) {
+    setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, deviceId } : lane)));
+  }
+
+  function toggleLaneMic(laneId: string) {
+    setMicOff((current) => ({ ...current, [laneId]: !current[laneId] }));
+  }
+
+  const handleSample = useCallback((laneId: string, hit: boolean) => {
+    const current = passTalliesRef.current;
+    passTalliesRef.current = { ...current, [laneId]: addSample(current[laneId] ?? EMPTY_TALLY, SAMPLE_SECONDS, hit) };
+    setPassTallies(passTalliesRef.current);
   }, []);
 
-  // Called by the playback poll when a pass reaches its end: the pass moves into the session
-  // and the stored history (and leaves the live pass tally, so nothing is counted twice).
+  // Called by the playback poll when a pass reaches its end: each lane's pass moves into its
+  // session and the stored history (and leaves the live pass tallies, so nothing is counted twice).
   useEffect(() => {
     completePassRef.current = () => {
-      if (passTally.targetSeconds === 0) return;
-      setHistory(
-        appendScoreRecord({
+      const tallies = passTalliesRef.current;
+      let latest = history;
+      lanes.forEach((lane, index) => {
+        const tally = tallies[lane.id];
+        if (!tally || tally.targetSeconds === 0) return;
+        latest = appendScoreRecord({
           exerciseId: exercise.id,
           exerciseName: exercise.name,
           finishedAt: Date.now(),
           playbackRate,
-          ...passTally,
-        })
-      );
-      setSessionTally((tally) => addTallies(tally, passTally));
-      setPassTally(EMPTY_TALLY);
+          inputId: lane.id,
+          inputLabel: laneLabel(lane, index + 1),
+          ...tally,
+        });
+      });
+      setHistory(latest);
+      setSessionTallies((current) => {
+        const next = { ...current };
+        for (const [laneId, tally] of Object.entries(tallies)) {
+          next[laneId] = addTallies(next[laneId] ?? EMPTY_TALLY, tally);
+        }
+        return next;
+      });
+      passTalliesRef.current = {};
+      setPassTallies({});
     };
   });
 
@@ -212,13 +238,6 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       setPlaying((p) => !p);
     }
   }
-
-  function selectMic(deviceId: string) {
-    setPreferredMicId(deviceId);
-    saveMicDeviceId(deviceId);
-  }
-
-  const showMicPicker = audioInputs.inputs.length > 0 && pitchTracker.status !== 'off';
 
   function handleNoteClick(pitchClass: number) {
     if (muted) return;
@@ -253,7 +272,7 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
           setMuted((m) => !m);
           break;
         case 'toggleMic':
-          setMicEnabled((on) => !on);
+          toggleLaneMic(PRIMARY_LANE_ID);
           break;
         case 'toggleLoop':
           setLoop((l) => !l);
@@ -304,52 +323,21 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
   return (
     <section className="exercise-panel">
       <ScoreBoard
-        session={addTallies(sessionTally, passTally)}
-        overall={addTallies(historyTally, passTally)}
+        rows={lanes.map((lane, index) => {
+          const pass = passTallies[lane.id] ?? EMPTY_TALLY;
+          return {
+            laneId: lane.id,
+            label: laneLabel(lane, index + 1),
+            session: addTallies(sessionTallies[lane.id] ?? EMPTY_TALLY, pass),
+            overall: addTallies(totalTallyForInput(history, lane.id), pass),
+          };
+        })}
         onOpenHistory={() => setHistoryOpen(true)}
       />
       <div className="exercise-info">
         <h2 className="exercise-title">{exercise.name}</h2>
         <p className="exercise-description">{exercise.description}</p>
 
-        {pitchTracker.status === 'requesting' && (
-          <p className="status-message">Pedindo acesso ao microfone…</p>
-        )}
-        {pitchTracker.status === 'error' && (
-          <p className="status-message" role="alert">
-            Erro ao acessar o microfone: {pitchTracker.errorMessage}
-          </p>
-        )}
-        {showMicPicker ? (
-          <div className="mic-picker">
-            <span aria-hidden="true">🎙️</span>
-            <select
-              className="mic-select"
-              aria-label="Microfone"
-              value={pitchTracker.deviceId ?? preferredMicId ?? ''}
-              onChange={(event) => selectMic(event.target.value)}
-            >
-              {audioInputs.inputs.map((input) => (
-                <option key={input.deviceId} value={input.deviceId}>
-                  {input.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={audioInputs.refresh}
-              aria-label="Atualizar lista de microfones"
-            >
-              🔄
-            </button>
-          </div>
-        ) : (
-          pitchTracker.status === 'listening' && (
-            <p className="status-message">🎙️ {pitchTracker.deviceName ?? 'Microfone ativo'}</p>
-          )
-        )}
-        {pitchTracker.status === 'off' && <p className="status-message">Mic desativado</p>}
         {toneError && (
           <p className="status-message" role="alert">
             Erro ao tocar o áudio de referência: {toneError}
@@ -358,24 +346,30 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
       </div>
 
       <div className="exercise-stage">
-        <div className="wheel-stage">
-          <PitchMeter
-            ref={wheelRef}
-            detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
-            targetMidiNumber={targetNote?.midiNumber ?? null}
-            micDisconnected={pitchTracker.status === 'error'}
-            onNoteClick={handleNoteClick}
-          />
+        <div className={lanes.length > 1 ? 'lanes lanes-multiple' : 'lanes'}>
+          {lanes.map((lane, index) => (
+            <InputLane
+              key={lane.id}
+              lane={lane}
+              position={index + 1}
+              sensitivity={micSensitivity}
+              micEnabled={!micOff[lane.id]}
+              onToggleMic={() => toggleLaneMic(lane.id)}
+              targetMidiNumber={targetNote?.midiNumber ?? null}
+              scoringActive={playing && !ended}
+              audioInputs={audioInputs.inputs}
+              onRefreshInputs={audioInputs.refresh}
+              onSelectDevice={(deviceId) => selectLaneDevice(lane.id, deviceId)}
+              onRemove={lane.id === PRIMARY_LANE_ID ? undefined : () => removeLane(lane.id)}
+              onSample={handleSample}
+              onNoteClick={handleNoteClick}
+              wheelRef={lane.id === PRIMARY_LANE_ID ? wheelRef : undefined}
+            />
+          ))}
         </div>
-
-        <div className="waveform-stage">
-          <Waveform
-            samples={pitchTracker.waveform}
-            detectedNote={pitchTracker.status === 'listening' ? pitchTracker.currentNote : null}
-            targetMidiNumber={targetNote?.midiNumber ?? null}
-            micDisconnected={pitchTracker.status === 'error'}
-          />
-        </div>
+        <button type="button" className="add-lane" onClick={addLane}>
+          + Adicionar entrada
+        </button>
       </div>
 
       <div className="exercise-controls">
@@ -397,16 +391,6 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
           aria-label={muted ? 'Ativar som' : 'Silenciar'}
         >
           {muted ? '🔇' : '🔊'}
-        </button>
-
-        <button
-          type="button"
-          className={micEnabled ? 'icon-button' : 'icon-button is-off'}
-          onClick={() => setMicEnabled((on) => !on)}
-          aria-pressed={!micEnabled}
-          aria-label={micEnabled ? 'Desligar microfone' : 'Ligar microfone'}
-        >
-          🎙️
         </button>
 
         <label className="speed-control">

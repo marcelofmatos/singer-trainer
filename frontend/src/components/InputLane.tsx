@@ -48,6 +48,9 @@ export function InputLane({
   const tracker = usePitchTracker(sensitivity, micEnabled, lane.deviceId, { fallbackToDefault: isPrimary });
   const name = isPrimary ? 'Microfone' : `Entrada ${position}`;
   const detected = tracker.status === 'listening' ? tracker.currentNote : null;
+  const selectedDeviceId = tracker.deviceId ?? lane.deviceId ?? '';
+  // An unplugged device isn't listed; without a placeholder the select would show another device's name.
+  const deviceMissing = selectedDeviceId !== '' && !audioInputs.some((input) => input.deviceId === selectedDeviceId);
 
   // Device labels only appear once permission is granted, so re-read them when this lane opens a device.
   useEffect(() => {
@@ -87,9 +90,14 @@ export function InputLane({
           <select
             className="mic-select"
             aria-label={name}
-            value={tracker.deviceId ?? lane.deviceId ?? ''}
+            value={selectedDeviceId}
             onChange={(event) => onSelectDevice(event.target.value)}
           >
+            {deviceMissing && (
+              <option value={selectedDeviceId} disabled>
+                Entrada desconectada
+              </option>
+            )}
             {audioInputs.map((input) => (
               <option key={input.deviceId} value={input.deviceId}>
                 {input.label}

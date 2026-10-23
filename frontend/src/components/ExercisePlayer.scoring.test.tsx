@@ -8,8 +8,10 @@ const tracker: { state: PitchTrackerState } = {
   state: { status: 'listening', errorMessage: null, currentNote: null, waveform: [], deviceName: null, deviceId: null },
 };
 
+// InputLane calls usePitchTracker(sensitivity, enabled, deviceId, options); every lane gets the same state.
 vi.mock('../hooks/usePitchTracker', () => ({
-  usePitchTracker: () => tracker.state,
+  usePitchTracker: (_sensitivity: number, _enabled: boolean, _deviceId: string | null, _options?: unknown) =>
+    tracker.state,
 }));
 
 // One second-long C4, so a full pass is ten 100ms scoring ticks.
@@ -92,15 +94,15 @@ describe('ExercisePlayer scoring', () => {
     expect(history).toHaveLength(1);
     expect(history[0]).toMatchObject({ exerciseId: 'one-note', exerciseName: 'Uma nota' });
     expect(history[0].hitSeconds / history[0].targetSeconds).toBeCloseTo(1);
-    expect(screen.getByTestId('score-session-percent').textContent).toBe('100%');
-    expect(screen.getByTestId('score-overall-percent').textContent).toBe('100%');
+    expect(screen.getByTestId('score-session-percent-primary').textContent).toBe('100%');
+    expect(screen.getByTestId('score-overall-percent-primary').textContent).toBe('100%');
   });
 
   it('counts silence as a miss', () => {
     renderPlayer();
     advance(1200);
     expect(savedHistory()[0].hitSeconds).toBe(0);
-    expect(screen.getByTestId('score-session-percent').textContent).toBe('0%');
+    expect(screen.getByTestId('score-session-percent-primary').textContent).toBe('0%');
   });
 
   it('does not count time while paused', () => {
@@ -108,7 +110,7 @@ describe('ExercisePlayer scoring', () => {
     renderPlayer();
     fireEvent.keyDown(document.body, { key: ' ' });
     advance(500);
-    expect(screen.getByTestId('score-session-time').textContent).toBe('0,0 s');
+    expect(screen.getByTestId('score-session-time-primary').textContent).toBe('0,0 s');
   });
 
   it('does not record passes while the microphone is not listening', () => {
@@ -128,8 +130,8 @@ describe('ExercisePlayer scoring', () => {
     tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 4, midiNumber: 60, cents: 0 } };
     renderPlayer();
     advance(1200);
-    expect(screen.getByTestId('score-session-percent').textContent).toBe('100%');
-    expect(screen.getByTestId('score-overall-percent').textContent).toBe('9%');
+    expect(screen.getByTestId('score-session-percent-primary').textContent).toBe('100%');
+    expect(screen.getByTestId('score-overall-percent-primary').textContent).toBe('9%');
   });
 
   it('opens the score history with H and from the score board', () => {

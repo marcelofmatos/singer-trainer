@@ -107,6 +107,26 @@ describe('InputLane', () => {
     expect(screen.getByRole('alert').textContent).toContain('Entrada desconectada');
   });
 
+  it('shows a disabled "Entrada desconectada" option instead of another device when its device is missing', () => {
+    tracker.state = { ...tracker.state, status: 'error', errorMessage: 'Entrada desconectada', deviceId: null };
+    renderLane({ lane: { id: 'lane-2', deviceId: 'gone' }, position: 2, onRemove: vi.fn() });
+    const select = screen.getByRole('combobox', { name: 'Entrada 2' }) as HTMLSelectElement;
+    expect(select.value).toBe('gone');
+    expect(select.selectedOptions[0].textContent).toBe('Entrada desconectada');
+    expect(select.selectedOptions[0].disabled).toBe(true);
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual([
+      'Entrada desconectada',
+      'USB',
+      'Monitor',
+    ]);
+  });
+
+  it('does not add the placeholder when the device is listed', () => {
+    renderLane();
+    const select = screen.getByRole('combobox', { name: 'Microfone' }) as HTMLSelectElement;
+    expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['USB', 'Monitor']);
+  });
+
   it('shows "Mic desativado" when off', () => {
     tracker.state = { ...tracker.state, status: 'off', deviceId: null };
     renderLane({ micEnabled: false });
