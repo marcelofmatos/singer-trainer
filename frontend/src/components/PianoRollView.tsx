@@ -110,9 +110,11 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
       {voiceRuns.map((run) => {
         const status = run[run.length - 1].status;
         const color = status ? STATUS_COLORS[status] : '#ffffff';
+        // A run may start with the previous run's last point, but each sample ends at most one run.
+        const key = run[run.length - 1].time;
         return run.length === 1 ? (
           <circle
-            key={run[0].time}
+            key={key}
             data-testid="roll-voice"
             data-status={status ?? undefined}
             cx={x(run[0].time)}
@@ -122,7 +124,7 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
           />
         ) : (
           <polyline
-            key={run[0].time}
+            key={key}
             data-testid="roll-voice"
             data-status={status ?? undefined}
             points={run.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}

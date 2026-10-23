@@ -54,6 +54,28 @@ describe('PianoRollView', () => {
     expect(pieces[pieces.length - 1].getAttribute('data-status')).toBe('close');
   });
 
+  it('keys voice runs uniquely when the status flips right after silence', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { rerender } = render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      rerender(<PianoRollView detectedNote={note(60, 0)} targetMidiNumber={null} micDisconnected={false} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      rerender(<PianoRollView detectedNote={note(60, 40)} targetMidiNumber={null} micDisconnected={false} />);
+      act(() => {
+        vi.advanceTimersByTime(50);
+      });
+      const duplicateKeyWarnings = consoleError.mock.calls.filter((call) => String(call[0]).includes('same key'));
+      expect(duplicateKeyWarnings).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('does not draw voice points outside the computed range', () => {
     const { rerender } = render(<PianoRollView detectedNote={note(60, 0)} targetMidiNumber={null} micDisconnected={false} />);
     act(() => {
