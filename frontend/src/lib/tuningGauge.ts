@@ -38,3 +38,15 @@ export function statusForNote(
       : detectedNote.cents;
   return tuningStatus(cents);
 }
+
+/**
+ * Tuning status of a detected note against the target pitch class in any octave (same rule
+ * as the score), or against the nearest note when there is no target.
+ */
+export function statusForPitch(detectedNote: NoteInfo | null, targetMidiNumber: number | null): TuningStatus | null {
+  if (!detectedNote) return null;
+  if (targetMidiNumber === null) return tuningStatus(detectedNote.cents);
+  const semitones = detectedNote.midiNumber - targetMidiNumber;
+  const wrapped = ((((semitones % 12) + 18) % 12) - 6);
+  return tuningStatus(wrapped * 100 + detectedNote.cents);
+}

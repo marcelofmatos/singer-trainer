@@ -18,6 +18,7 @@ describe('resolveShortcut', () => {
     ['s', 'toggleMute'],
     ['m', 'toggleMic'],
     ['r', 'toggleLoop'],
+    ['v', 'nextView'],
     ['ArrowRight', 'nextNote'],
     ['ArrowDown', 'nextNote'],
     ['ArrowLeft', 'previousNote'],
