@@ -169,6 +169,17 @@ describe('ExercisePlayer input latency', () => {
     expect(lanes[1].querySelector('[data-testid="note-bubble-E"]')?.getAttribute('data-active')).toBe('true');
   });
 
+  it('leaves a late input without a target once the exercise has ended', async () => {
+    storeLanes([
+      { id: 'primary', deviceId: 'mic', latencyMs: 200 },
+      { id: 'lane-2', deviceId: 'monitor' },
+    ]);
+    const { container } = renderPlayer(TWO_NOTES);
+    await flush();
+    advance(1500);
+    expect(container.querySelectorAll('[data-active="true"]')).toHaveLength(0);
+  });
+
   // The mic sings along with what the reference really played; the monitor hears it referenceLatency later.
   async function scoreAlignedSinger(referenceLatency: number) {
     storeLanes([

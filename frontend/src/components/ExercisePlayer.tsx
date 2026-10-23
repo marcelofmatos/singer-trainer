@@ -274,8 +274,9 @@ export function ExercisePlayer({
   }, [scaledExercise, cycle, isContinuousMode]);
 
   // Each lane hears the exercise late by its latency, so its target is the note of its corrected time.
+  // Once the exercise has ended the clock stops at its end, which a late lane would still see as the last note.
   const exerciseTargetFor = (lane: InputLaneConfig) =>
-    noteAtTime(scaledExercise, elapsed - (lane.latencyMs ?? 0) / 1000)?.midiNumber ?? null;
+    ended ? null : noteAtTime(scaledExercise, elapsed - (lane.latencyMs ?? 0) / 1000)?.midiNumber ?? null;
 
   // A lane on the system default (or an alias like "default") is named after the real device it opened.
   function laneLabel(lane: InputLaneConfig, position: number): string {
