@@ -17,6 +17,22 @@ const tracker: { state: PitchTrackerState } = {
   },
 };
 
+const calibration = vi.hoisted(() => ({
+  // Onsets relative to the moment the sequence is scheduled.
+  offsets: [100, 600, 1100, 1600, 2100, 2600],
+}));
+
+vi.mock('../audio/calibrationTone', () => ({
+  playCalibrationSequence: vi.fn((_context: AudioContext, now: () => number) =>
+    calibration.offsets.map((offset) => now() + offset)
+  ),
+}));
+
+const closeContext = vi.fn(() => Promise.resolve());
+class MockAudioContext {
+  close = closeContext;
+}
+
 vi.mock('../hooks/usePitchTracker', () => ({
   usePitchTracker: (...args: unknown[]) => {
     trackerCalls.push(args);
@@ -69,10 +85,13 @@ describe('InputLane', () => {
       groupId: 'g-usb',
     };
     vi.useFakeTimers();
+    vi.stubGlobal('AudioContext', MockAudioContext);
+    closeContext.mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it('opens its own device, falling back to the default only on the primary lane', () => {
@@ -257,5 +276,116 @@ describe('InputLane', () => {
     notePercents[9] = 80;
     renderLane({ notePercents });
     expect(screen.getByTestId('note-percent-A').textContent).toBe('80%');
+  });
+
+  describe('latency', () => {
+    const CALIBRATION_MIDIS = [60, 67, 60, 67, 60, 67];
+
+    function note(midiNumber: number) {
+      const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+      return { noteName: names[midiNumber % 12], octave: Math.floor(midiNumber / 12) - 1, midiNumber, cents: 0 };
+    }
+
+    it('shows the latency on the header button only when above zero', () => {
+      const { unmount } = render(<InputLane {...laneProps()} />);
+      expect(screen.getByRole('button', { name: 'Atraso da entrada' }).textContent).toBe('⏱');
+      unmount();
+      render(<InputLane {...laneProps({ latencyMs: 180 })} />);
+      expect(screen.getByRole('button', { name: 'Atraso da entrada' }).textContent).toBe('⏱ 180 ms');
+    });
+
+    it('toggles the latency panel from the header button', () => {
+      renderLane({ latencyMs: 180, onLatencyChange: vi.fn() });
+      const toggle = screen.getByRole('button', { name: 'Atraso da entrada' });
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(screen.queryByRole('slider', { name: 'Atraso' })).toBeNull();
+      fireEvent.click(toggle);
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      const slider = screen.getByRole('slider', { name: 'Atraso' }) as HTMLInputElement;
+      expect(slider.min).toBe('0');
+      expect(slider.max).toBe('1000');
+      expect(slider.step).toBe('10');
+      expect(slider.value).toBe('180');
+      expect(screen.getByText('180 ms')).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Calibrar' })).toBeDefined();
+      fireEvent.click(toggle);
+      expect(screen.queryByRole('slider', { name: 'Atraso' })).toBeNull();
+    });
+
+    it('keeps the panel out of the flow before the visualization', () => {
+      const { container } = render(<InputLane {...laneProps()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      const panel = container.querySelector('.lane-latency-panel');
+      expect(panel?.parentElement?.classList.contains('lane-header')).toBe(true);
+      expect(container.querySelector('.lane-status')!.nextElementSibling?.classList.contains('view-stage')).toBe(true);
+    });
+
+    it('reports a slider change for this lane', () => {
+      const onLatencyChange = vi.fn();
+      renderLane({ lane: { id: 'lane-2', deviceId: 'monitor' }, position: 2, onRemove: vi.fn(), onLatencyChange });
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      fireEvent.change(screen.getByRole('slider', { name: 'Atraso' }), { target: { value: '250' } });
+      expect(onLatencyChange).toHaveBeenCalledWith('lane-2', 250);
+    });
+
+    it('calibrates from the test notes this lane detects', () => {
+      const onLatencyChange = vi.fn();
+      const onCalibrationStart = vi.fn();
+      const props = laneProps({ onLatencyChange, onCalibrationStart });
+      const { rerender } = render(<InputLane {...props} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+
+      expect(onCalibrationStart).toHaveBeenCalledTimes(1);
+      expect(screen.getByText('Calibrando…')).toBeDefined();
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(true);
+
+      let elapsed = 0;
+      calibration.offsets.forEach((offset, i) => {
+        act(() => {
+          vi.advanceTimersByTime(offset + 200 - elapsed);
+        });
+        elapsed = offset + 200;
+        // An octave below, as a voice-range tracker may report it: pitch class is what counts.
+        tracker.state = { ...tracker.state, currentNote: note(CALIBRATION_MIDIS[i] - 12) };
+        rerender(<InputLane {...props} />);
+        act(() => {
+          vi.advanceTimersByTime(250);
+        });
+        elapsed += 250;
+        tracker.state = { ...tracker.state, currentNote: null };
+        rerender(<InputLane {...props} />);
+      });
+      expect(onLatencyChange).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(onLatencyChange).toHaveBeenCalledWith('primary', 200);
+      expect(screen.getByText('Atraso medido: 200 ms')).toBeDefined();
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(false);
+      expect(closeContext).toHaveBeenCalled();
+    });
+
+    it('reports a failure and keeps the latency when nothing was detected', () => {
+      const onLatencyChange = vi.fn();
+      renderLane({ onLatencyChange });
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(onLatencyChange).not.toHaveBeenCalled();
+      expect(screen.getByText('Não foi possível calibrar: a entrada não captou as notas de teste.')).toBeDefined();
+      expect(closeContext).toHaveBeenCalled();
+    });
+
+    it('closes the calibration audio when unmounted mid-run', () => {
+      const { unmount } = render(<InputLane {...laneProps()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      unmount();
+      expect(closeContext).toHaveBeenCalled();
+    });
   });
 });

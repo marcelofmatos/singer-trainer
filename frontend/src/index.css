@@ -529,11 +529,94 @@ body {
 }
 
 .lane-header {
+  /* Spans the lane so the latency panel anchored to it gets the lane's full width. */
+  position: relative;
+  align-self: stretch;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   max-width: 100%;
   margin-bottom: 1rem;
+}
+
+.icon-button.latency-button {
+  width: auto;
+  min-width: 2.25rem;
+  padding: 0 0.6rem;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Opens over the content below so the visualization never moves. */
+.lane-latency-panel {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.lane-latency-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.lane-latency-row input[type='range'] {
+  accent-color: var(--color-accent);
+  width: 140px;
+}
+
+/* Reserve room for "1000 ms" so the slider doesn't shift as the value changes. */
+.lane-latency-value {
+  min-width: 7ch;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.lane-calibrate {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.lane-calibrate:hover:not(:disabled),
+.lane-calibrate:focus-visible {
+  border-color: var(--color-accent);
+}
+
+.lane-calibrate:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.lane-latency-status {
+  flex-basis: 100%;
+  margin: 0;
+  min-height: 1.2em;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--color-text-muted);
 }
 
 .lane-badge {
