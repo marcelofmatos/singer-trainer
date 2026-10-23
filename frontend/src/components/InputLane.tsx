@@ -3,7 +3,6 @@ import { useEffect, useRef, type Ref } from 'react';
 import { usePitchTracker } from '../hooks/usePitchTracker';
 import type { AudioInput } from '../hooks/useAudioInputs';
 import { PRIMARY_LANE_ID, type InputLaneConfig } from '../lib/inputLanes';
-import { isHit } from '../lib/scoring';
 import type { NoteInfo } from '../lib/noteUtils';
 import type { VisualizationMode } from '../lib/visualization';
 import { KeyboardView } from './KeyboardView';
@@ -26,7 +25,12 @@ export interface InputLaneProps {
   /** Reports the device (and its group) this lane's tracker actually opened; null while none is open. */
   onDeviceInUse: (laneId: string, deviceId: string | null, groupId: string | null) => void;
   onRemove?: () => void;
-  onSample: (laneId: string, hit: boolean) => void;
+  /** Called on the scoring tick with what this lane hears; the player decides whether it is a hit. */
+  onSample: (laneId: string, detected: NoteInfo | null) => void;
+  /** Reports the note this lane currently hears; null when silent. */
+  onNote: (laneId: string, note: NoteInfo | null) => void;
+  /** The reference lane is heard, not scored. */
+  isReference: boolean;
   onPlayNote: (midiNumber: number) => void;
   visualization: VisualizationMode;
   wheelRef?: Ref<NoteNavigatorHandle>;
@@ -51,6 +55,8 @@ export function InputLane({
   onDeviceInUse,
   onRemove,
   onSample,
+  onNote,
+  isReference,
   onPlayNote,
   visualization,
   wheelRef,
@@ -96,8 +102,9 @@ export function InputLane({
   }, [lane.id, tracker.deviceId, tracker.groupId]);
 
   // Sampled on its own tick from a ref so the interval isn't re-armed on every detection update.
-  const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null }>({
+  const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null; isReference: boolean }>({
     active: false,
+    isReference: false,
     target: null,
     detected: null,
   });
@@ -107,22 +114,35 @@ export function InputLane({
       active: scoringActive && tracker.status === 'listening',
       target: targetMidiNumber,
       detected: tracker.currentNote,
+      isReference,
     };
     onSampleRef.current = onSample;
   });
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      const { active, target, detected: note } = scoringRef.current;
-      if (!active || target === null) return;
-      onSampleRef.current(lane.id, isHit(note, target));
+      const { active, target, detected: note, isReference: reference } = scoringRef.current;
+      if (!active || target === null || reference) return;
+      onSampleRef.current(lane.id, note);
     }, SCORE_TICK_MS);
     return () => clearInterval(intervalId);
   }, [lane.id]);
 
+  const onNoteRef = useRef(onNote);
+  useEffect(() => {
+    onNoteRef.current = onNote;
+  });
+  const reportedNote = tracker.status === 'listening' ? tracker.currentNote : null;
+  useEffect(() => {
+    onNoteRef.current(lane.id, reportedNote);
+    // reportedNote is keyed by value (midi, cents) so a new object with the same pitch doesn't re-report.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lane.id, tracker.status, reportedNote?.midiNumber, reportedNote?.cents]);
+
   return (
     <div className="input-lane">
       <div className="lane-header">
+        {isReference && <span className="lane-badge">Referência</span>}
         {audioInputs.length > 0 && (
           <select
             className="mic-select"

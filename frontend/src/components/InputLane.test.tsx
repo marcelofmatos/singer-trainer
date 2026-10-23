@@ -43,6 +43,8 @@ function laneProps(overrides: Partial<InputLaneProps> = {}): InputLaneProps {
     onSelectDevice: vi.fn(),
     onDeviceInUse: vi.fn(),
     onSample: vi.fn(),
+    onNote: vi.fn(),
+    isReference: false,
     onPlayNote: vi.fn(),
     visualization: 'wheel',
     ...overrides,
@@ -117,7 +119,7 @@ describe('InputLane', () => {
       vi.advanceTimersByTime(300);
     });
     expect(props.onSample).toHaveBeenCalledTimes(3);
-    expect(props.onSample).toHaveBeenLastCalledWith('primary', true);
+    expect(props.onSample).toHaveBeenLastCalledWith('primary', tracker.state.currentNote);
   });
 
   it('does not sample while inactive, without a target or without listening', () => {
@@ -209,5 +211,27 @@ describe('InputLane', () => {
     const props = renderLane({ visualization: 'wheel' });
     fireEvent.click(screen.getByTestId('note-bubble-A'));
     expect(props.onPlayNote).toHaveBeenCalledWith(69);
+  });
+
+  it('shows a reference badge and never samples when it is the reference', () => {
+    tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 3, midiNumber: 48, cents: 0 } };
+    const props = renderLane({ isReference: true });
+    expect(screen.getByText('Referência')).toBeDefined();
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(props.onSample).not.toHaveBeenCalled();
+  });
+
+  it('reports its current note, and null when it goes silent', () => {
+    const note = { noteName: 'C', octave: 3, midiNumber: 48, cents: 0 };
+    tracker.state = { ...tracker.state, currentNote: note };
+    const props = laneProps();
+    const { rerender } = render(<InputLane {...props} />);
+    expect(props.onNote).toHaveBeenLastCalledWith('primary', note);
+    tracker.state = { ...tracker.state, currentNote: null };
+    rerender(<InputLane {...props} />);
+    expect(props.onNote).toHaveBeenLastCalledWith('primary', null);
+    expect(props.onNote).toHaveBeenCalledTimes(2);
   });
 });

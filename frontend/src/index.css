@@ -509,6 +509,17 @@ body {
   margin-bottom: 1rem;
 }
 
+.lane-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
 .add-lane {
   margin-top: 0.5rem;
   font-family: var(--font-body);
