@@ -21,6 +21,21 @@ export default function App() {
     setActiveExerciseId(BUILTIN_EXERCISES[(index + offset + count) % count].id);
   }
 
+  const exerciseSelect = (
+    <select
+      className="exercise-select"
+      aria-label="Exercício"
+      value={activeExerciseId}
+      onChange={(event) => setActiveExerciseId(event.target.value)}
+    >
+      {BUILTIN_EXERCISES.map((exercise) => (
+        <option key={exercise.id} value={exercise.id}>
+          {exercise.name}
+        </option>
+      ))}
+    </select>
+  );
+
   return (
     <main className="app">
       <header className="app-header">
@@ -28,23 +43,11 @@ export default function App() {
         <p className="app-subtitle">Feedback de afinação em tempo real, ao vivo.</p>
       </header>
 
-      <select
-        className="exercise-select"
-        aria-label="Exercício"
-        value={activeExerciseId}
-        onChange={(event) => setActiveExerciseId(event.target.value)}
-      >
-        {BUILTIN_EXERCISES.map((exercise) => (
-          <option key={exercise.id} value={exercise.id}>
-            {exercise.name}
-          </option>
-        ))}
-      </select>
-
       <ExercisePlayer
         exercise={activeExercise}
         onPreviousExercise={() => selectAdjacentExercise(-1)}
         onNextExercise={() => selectAdjacentExercise(1)}
+        exerciseSelect={exerciseSelect}
       />
     </main>
   );

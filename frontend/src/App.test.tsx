@@ -1,6 +1,6 @@
 // frontend/src/App.test.tsx
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import App from './App';
 import { BUILTIN_EXERCISES } from './lib/exercises';
 
@@ -16,6 +16,13 @@ describe('App', () => {
     BUILTIN_EXERCISES.forEach((exercise) => {
       expect(screen.getByRole('option', { name: exercise.name })).toBeDefined();
     });
+  });
+
+  it('shows the speed control next to the exercise selector', () => {
+    render(<App />);
+    const toolbar = screen.getByRole('toolbar', { name: 'Exercício e velocidade' });
+    expect(within(toolbar).getByLabelText('Exercício')).toBeDefined();
+    expect(within(toolbar).getByRole('slider', { name: /velocidade/i })).toBeDefined();
   });
 
   it('shows the first exercise selected and displayed by default', () => {

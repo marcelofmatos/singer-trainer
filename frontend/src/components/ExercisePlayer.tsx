@@ -1,5 +1,5 @@
 // frontend/src/components/ExercisePlayer.tsx
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Exercise } from '../lib/exercises';
 import { exerciseDuration, noteAtTime, scaleExerciseTiming } from '../lib/exerciseTiming';
 import { loadPlaybackPreferences, savePlaybackPreferences } from '../lib/playbackPreferences';
@@ -27,6 +27,7 @@ export interface ExercisePlayerProps {
   exercise: Exercise;
   onPreviousExercise: () => void;
   onNextExercise: () => void;
+  exerciseSelect: ReactNode;
 }
 
 const MIN_PLAYBACK_RATE = 0.5;
@@ -50,7 +51,12 @@ const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 // Seconds each lane sample stands for; must match InputLane's 100ms scoring tick.
 const SAMPLE_SECONDS = 0.1;
 
-export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }: ExercisePlayerProps) {
+export function ExercisePlayer({
+  exercise,
+  onPreviousExercise,
+  onNextExercise,
+  exerciseSelect,
+}: ExercisePlayerProps) {
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
@@ -349,6 +355,21 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         })}
         onOpenHistory={() => setHistoryOpen(true)}
       />
+      <div className="exercise-toolbar" role="toolbar" aria-label="Exercício e velocidade">
+        {exerciseSelect}
+        <label className="speed-control">
+          Velocidade
+          <input
+            type="range"
+            min={MIN_PLAYBACK_RATE}
+            max={MAX_PLAYBACK_RATE}
+            step={PLAYBACK_RATE_STEP}
+            value={playbackRate}
+            onChange={(event) => setPlaybackRate(Number(event.target.value))}
+          />
+          <span className="speed-value">{playbackRate.toFixed(2)}x</span>
+        </label>
+      </div>
       <div className="exercise-info">
         <h2 className="exercise-title">{exercise.name}</h2>
         <p className="exercise-description">{exercise.description}</p>
@@ -408,19 +429,6 @@ export function ExercisePlayer({ exercise, onPreviousExercise, onNextExercise }:
         >
           {muted ? '🔇' : '🔊'}
         </button>
-
-        <label className="speed-control">
-          Velocidade
-          <input
-            type="range"
-            min={MIN_PLAYBACK_RATE}
-            max={MAX_PLAYBACK_RATE}
-            step={PLAYBACK_RATE_STEP}
-            value={playbackRate}
-            onChange={(event) => setPlaybackRate(Number(event.target.value))}
-          />
-          <span className="speed-value">{playbackRate.toFixed(2)}x</span>
-        </label>
 
         <label className="loop-toggle">
           <input

@@ -89,6 +89,7 @@ function renderPlayer(overrides: { onPreviousExercise?: () => void; onNextExerci
       exercise={TEST_EXERCISE}
       onPreviousExercise={overrides.onPreviousExercise ?? (() => {})}
       onNextExercise={overrides.onNextExercise ?? (() => {})}
+      exerciseSelect={null}
     />
   );
 }

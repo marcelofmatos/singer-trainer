@@ -51,8 +51,7 @@ body {
 }
 
 .exercise-select {
-  display: block;
-  margin: 0 auto 2.5rem;
+  margin: 0;
   font-family: var(--font-body);
   font-size: 0.95rem;
   font-weight: 600;
@@ -71,6 +70,16 @@ body {
 .exercise-select:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+.exercise-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  width: 100%;
+  margin-bottom: 2rem;
 }
 
 .exercise-panel {
@@ -511,17 +520,14 @@ body {
     margin-bottom: 1.5rem;
   }
 
-  .exercise-select {
-    margin-bottom: 1.5rem;
-  }
-
   .exercise-panel {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
+      'toolbar toolbar'
       'info stage'
       'controls stage';
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto auto 1fr;
     column-gap: 3rem;
     align-items: start;
     text-align: left;
@@ -531,6 +537,11 @@ body {
   .exercise-panel:has(.lanes-multiple) {
     grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
     column-gap: 2rem;
+  }
+
+  .exercise-toolbar {
+    grid-area: toolbar;
+    margin-bottom: 1.5rem;
   }
 
   .exercise-info {

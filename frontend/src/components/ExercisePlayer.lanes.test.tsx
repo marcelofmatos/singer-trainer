@@ -69,7 +69,7 @@ async function flush() {
 }
 
 function renderPlayer() {
-  return render(<ExercisePlayer exercise={EXERCISE} onPreviousExercise={() => {}} onNextExercise={() => {}} />);
+  return render(<ExercisePlayer exercise={EXERCISE} onPreviousExercise={() => {}} onNextExercise={() => {}} exerciseSelect={null} />);
 }
 
 describe('ExercisePlayer input lanes', () => {
