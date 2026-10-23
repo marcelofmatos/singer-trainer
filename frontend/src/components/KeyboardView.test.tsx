@@ -140,6 +140,41 @@ describe('KeyboardView', () => {
     expect(offset()).toBe(expected(72));
   });
 
+  it('keeps following the target when a key is clicked, which focuses it', () => {
+    const { onPlayNote } = renderKeyboard({ targetMidiNumber: 72 });
+    const key = screen.getByRole('button', { name: 'A2' });
+    fireEvent.pointerDown(key);
+    fireEvent.mouseDown(key);
+    act(() => (key as unknown as SVGGElement).focus());
+    fireEvent.click(key);
+    expect(onPlayNote).toHaveBeenCalledWith(45);
+    expect(document.activeElement).toBe(key);
+    expect(offset()).toBe(expected(72));
+  });
+
+  it('unpins a key focused from the computer keyboard as soon as a key is pressed with the pointer', () => {
+    const { ref } = renderKeyboard({ targetMidiNumber: 72 });
+    act(() => ref.current!.navigate('first'));
+    expect(offset()).toBe(expected(60));
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'C4' }));
+    expect(offset()).toBe(expected(72));
+  });
+
+  it('focuses keys without scrolling the window', () => {
+    const { ref } = renderKeyboard();
+    const focus = vi.spyOn(SVGElement.prototype, 'focus');
+    act(() => ref.current!.navigate('first'));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    focus.mockRestore();
+  });
+
+  it('leaves room above and below the keys so the 3px outline is not clipped', () => {
+    renderKeyboard();
+    const [, minY, , height] = screen.getByTestId('keyboard-keys').getAttribute('viewBox')!.split(' ').map(Number);
+    expect(minY).toBeLessThanOrEqual(-1.5);
+    expect(minY + height).toBeGreaterThanOrEqual(80 + 1.5);
+  });
+
   it('draws the target outline above every key, without catching clicks', () => {
     renderKeyboard({ targetMidiNumber: 64 });
     const outline = screen.getByTestId('keyboard-target-outline');

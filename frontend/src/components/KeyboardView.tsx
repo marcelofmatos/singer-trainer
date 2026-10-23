@@ -22,6 +22,7 @@ const WHITE_KEY_WIDTH = 20;
 const BLACK_KEY_WIDTH = 12;
 const WHITE_KEY_HEIGHT = 80;
 const BLACK_KEY_HEIGHT = 50;
+const OUTLINE_INSET = 2; // room above and below the keys so the 3px outline isn't clipped by the window
 
 // White keys are laid out left to right; black keys sit over the boundary to their left.
 let whiteIndex = -1;
@@ -48,6 +49,7 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
   const outOfRange = sungMidi !== null && (sungMidi < LOW_MIDI || sungMidi > HIGH_MIDI);
 
   const [focusableIndex, setFocusableIndex] = useState(INITIAL_FOCUS_MIDI - LOW_MIDI);
+  // Only a key reached from the computer keyboard (navigate) pins the window; a clicked key doesn't.
   const [focusedMidi, setFocusedMidi] = useState<number | null>(null);
   const lastFocusMidi = useRef(INITIAL_FOCUS_MIDI);
   const keyRefs = useRef<(SVGGElement | null)[]>([]);
@@ -60,7 +62,9 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
 
   function moveFocus(index: number) {
     setFocusableIndex(index);
-    keyRefs.current[index]?.focus();
+    // Focus first: it blurs the previous key, which unpins it.
+    keyRefs.current[index]?.focus({ preventScroll: true });
+    setFocusedMidi(LOW_MIDI + index);
   }
 
   useImperativeHandle(ref, () => ({
@@ -111,7 +115,7 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
           data-offset={String(Math.round(offset * 100) / 100)}
           className="keyboard-keys"
           style={{ transform: `translateX(${offset}%)` }}
-          viewBox={`0 0 ${WIDTH} ${WHITE_KEY_HEIGHT}`}
+          viewBox={`0 ${-OUTLINE_INSET} ${WIDTH} ${WHITE_KEY_HEIGHT + 2 * OUTLINE_INSET}`}
           aria-label="Teclado"
         >
           {ORDERED.map(({ midi, black, x }) => {
@@ -130,11 +134,9 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
                 data-target={isTarget ? 'true' : undefined}
                 data-status={lit ? status : undefined}
                 onClick={() => onPlayNote(midi)}
-                onFocus={() => {
-                  setFocusableIndex(index);
-                  setFocusedMidi(midi);
-                }}
+                onFocus={() => setFocusableIndex(index)}
                 onBlur={() => setFocusedMidi(null)}
+                onPointerDown={() => setFocusedMidi(null)}
                 onKeyDown={(event) => handleKeyDown(event, midi)}
                 style={{ cursor: 'pointer' }}
               >

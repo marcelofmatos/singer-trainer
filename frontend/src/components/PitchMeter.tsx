@@ -93,7 +93,7 @@ export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function
 
   function moveFocus(index: number) {
     setFocusableIndex(index);
-    bubbleRefs.current[index]?.focus();
+    bubbleRefs.current[index]?.focus({ preventScroll: true });
   }
 
   useImperativeHandle(ref, () => ({
