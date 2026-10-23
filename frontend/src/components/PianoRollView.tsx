@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { pitchClassIndex } from '../lib/chromaticWheel';
+import { CHROMATIC_NOTE_COLORS, pitchClassIndex } from '../lib/chromaticWheel';
 import { appendSample, pitchRange, type RollSample } from '../lib/pianoRoll';
 import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
@@ -15,12 +15,26 @@ export interface PianoRollViewProps {
 const WINDOW_MS = 6000;
 const TICK_MS = 50; // the tracker's own detection cadence
 const WIDTH = 360;
-const HEIGHT = 200;
-const LABEL_WIDTH = 28;
+const HEIGHT = 260;
+const LABEL_WIDTH = 34;
 const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
-// Below this row height (viewBox units) sharp labels would overlap, so only natural notes are named.
-const MIN_ROW_HEIGHT_FOR_ALL_LABELS = 9;
-const MAX_LABEL_FONT_SIZE = 9;
+const LABEL_FONT_SIZE = 11;
+// Rows are tinted with each note's wheel color, faint enough to keep the voice line and target bars readable.
+const ROW_TINT_OPACITY = 0.14;
+
+/**
+ * Rows to label at a fixed font size without labels touching: Cs first (an octave apart, so they always fit),
+ * then natural notes, then sharps, each kept only if it is at least one font height from every label so far.
+ */
+function labeledRows(rows: number[], rowHeight: number, fontSize: number): Set<number> {
+  const priority = (midi: number) =>
+    pitchClassIndex(midi) === 0 ? 0 : BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 2 : 1;
+  const labeled = new Set<number>();
+  for (const midi of [...rows].sort((a, b) => priority(a) - priority(b) || a - b)) {
+    if ([...labeled].every((other) => Math.abs(other - midi) * rowHeight >= fontSize)) labeled.add(midi);
+  }
+  return labeled;
+}
 
 /** Pitch over time: target as bars, voice as a line colored by tuning, last 6 seconds. */
 export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected }: PianoRollViewProps) {
@@ -72,8 +86,7 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
   });
 
   const rows = Array.from({ length: high - low + 1 }, (_, index) => high - index);
-  const labelAllRows = rowHeight >= MIN_ROW_HEIGHT_FOR_ALL_LABELS;
-  const labelFontSize = Math.min(MAX_LABEL_FONT_SIZE, rowHeight * (labelAllRows ? 0.9 : 1.8));
+  const labeled = labeledRows(rows, rowHeight, LABEL_FONT_SIZE);
 
   return (
     <div className={micDisconnected ? 'piano-roll-view is-disconnected' : 'piano-roll-view'}>
@@ -86,18 +99,20 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
         {rows.map((midi) => (
           <g key={midi}>
             <rect
+              data-testid={`roll-row-${midi}`}
               x={LABEL_WIDTH}
               y={y(midi) - rowHeight / 2}
               width={WIDTH - LABEL_WIDTH}
               height={rowHeight}
-              fill={BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 'rgba(255,255,255,0.03)' : 'transparent'}
+              fill={CHROMATIC_NOTE_COLORS[pitchClassIndex(midi)]}
+              fillOpacity={ROW_TINT_OPACITY}
             />
-            {(labelAllRows || !BLACK_PITCH_CLASSES.has(pitchClassIndex(midi))) && (
+            {labeled.has(midi) && (
               <text
                 x={2}
                 y={y(midi)}
                 dominantBaseline="central"
-                fontSize={labelFontSize}
+                fontSize={LABEL_FONT_SIZE}
                 fill={pitchClassIndex(midi) === 0 ? 'var(--color-text)' : 'var(--color-text-muted)'}
               >
                 {noteLabel(midi)}

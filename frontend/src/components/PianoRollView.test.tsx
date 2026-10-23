@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { PianoRollView } from './PianoRollView';
+import { CHROMATIC_NOTE_COLORS } from '../lib/chromaticWheel';
 
 const note = (midiNumber: number, cents: number) => ({ noteName: 'X', octave: 0, midiNumber, cents });
 
@@ -92,6 +93,15 @@ describe('PianoRollView', () => {
     expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
   });
 
+  it('tints each row with the note color from the wheel', () => {
+    const { container } = render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    const row = (midi: number) => container.querySelector(`[data-testid="roll-row-${midi}"]`)!;
+    expect(row(60).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[0]);
+    expect(row(61).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[1]);
+    expect(row(69).getAttribute('fill')).toBe(CHROMATIC_NOTE_COLORS[9]);
+    expect(Number(row(60).getAttribute('fill-opacity'))).toBeLessThanOrEqual(0.2);
+  });
+
   it('labels every semitone row when there is room', () => {
     render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
     ['C4', 'C#4', 'D4', 'D#4', 'E4', 'F4', 'F#4', 'G4', 'G#4', 'A4', 'A#4', 'B4', 'C5'].forEach((label) => {
@@ -99,17 +109,43 @@ describe('PianoRollView', () => {
     });
   });
 
-  it('labels only the natural notes when the range is too tall for every row', () => {
-    const { rerender } = render(<PianoRollView detectedNote={note(40, 0)} targetMidiNumber={null} micDisconnected={false} />);
+  function renderRange(lowMidi: number, highMidi: number) {
+    const { container, rerender } = render(
+      <PianoRollView detectedNote={note(lowMidi, 0)} targetMidiNumber={null} micDisconnected={false} />
+    );
     act(() => {
       vi.advanceTimersByTime(100);
     });
-    rerender(<PianoRollView detectedNote={note(76, 0)} targetMidiNumber={null} micDisconnected={false} />);
+    rerender(<PianoRollView detectedNote={note(highMidi, 0)} targetMidiNumber={null} micDisconnected={false} />);
     act(() => {
       vi.advanceTimersByTime(100);
     });
-    expect(screen.getByText('D4')).toBeDefined();
+    return container;
+  }
+
+  function labelPositions(container: HTMLElement) {
+    return [...container.querySelectorAll('svg.piano-roll text')].map((label) => ({
+      text: label.textContent,
+      y: Number(label.getAttribute('y')),
+      size: Number(label.getAttribute('font-size')),
+    }));
+  }
+
+  it('keeps a readable font and skips labels that would overlap when rows are tight', () => {
+    const container = renderRange(48, 70);
+    const labels = labelPositions(container);
+    expect(labels.every((label) => label.size === 11)).toBe(true);
+    const ys = labels.map((label) => label.y).sort((a, b) => a - b);
+    ys.slice(1).forEach((y, index) => expect(y - ys[index]).toBeGreaterThanOrEqual(11));
+    expect(screen.getByText('C4')).toBeDefined();
     expect(screen.queryByText('C#4')).toBeNull();
+  });
+
+  it('always labels the Cs, even when rows are very tight', () => {
+    const container = renderRange(36, 84);
+    ['C3', 'C4', 'C5'].forEach((label) => expect(screen.getByText(label)).toBeDefined());
+    expect(screen.queryByText('D4')).toBeNull();
+    expect(labelPositions(container).every((label) => label.size === 11)).toBe(true);
   });
 
   it('shows the sung note above the roll, and the mic icon when the mic fails', () => {
