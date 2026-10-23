@@ -18,6 +18,9 @@ const WIDTH = 360;
 const HEIGHT = 200;
 const LABEL_WIDTH = 28;
 const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
+// Below this row height (viewBox units) sharp labels would overlap, so only natural notes are named.
+const MIN_ROW_HEIGHT_FOR_ALL_LABELS = 9;
+const MAX_LABEL_FONT_SIZE = 9;
 
 /** Pitch over time: target as bars, voice as a line colored by tuning, last 6 seconds. */
 export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected }: PianoRollViewProps) {
@@ -69,6 +72,8 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
   });
 
   const rows = Array.from({ length: high - low + 1 }, (_, index) => high - index);
+  const labelAllRows = rowHeight >= MIN_ROW_HEIGHT_FOR_ALL_LABELS;
+  const labelFontSize = Math.min(MAX_LABEL_FONT_SIZE, rowHeight * (labelAllRows ? 0.9 : 1.8));
 
   return (
     <div className={micDisconnected ? 'piano-roll-view is-disconnected' : 'piano-roll-view'}>
@@ -87,8 +92,14 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
               height={rowHeight}
               fill={BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 'rgba(255,255,255,0.03)' : 'transparent'}
             />
-            {pitchClassIndex(midi) === 0 && (
-              <text x={2} y={y(midi)} dominantBaseline="central" fontSize="9" fill="var(--color-text-muted)">
+            {(labelAllRows || !BLACK_PITCH_CLASSES.has(pitchClassIndex(midi))) && (
+              <text
+                x={2}
+                y={y(midi)}
+                dominantBaseline="central"
+                fontSize={labelFontSize}
+                fill={pitchClassIndex(midi) === 0 ? 'var(--color-text)' : 'var(--color-text-muted)'}
+              >
                 {noteLabel(midi)}
               </text>
             )}
