@@ -36,7 +36,13 @@ quão perto você está da nota certa.
   um vídeo tocando em outra aba) ou outro mic, com "+ Adicionar entrada". Cada faixa tem
   seletor de dispositivo e liga/desliga; a montagem fica salva, e uma entrada
   desconectada aparece como tal até voltar. A tecla M liga/desliga o microfone da
-  primeira entrada (as outras usam o próprio botão).
+  primeira entrada (as outras usam o próprio botão). Ao adicionar, o app escolhe primeiro um
+  "Monitor of …" livre.
+
+  > **Fone Bluetooth:** evite usar o **microfone** de um fone Bluetooth como entrada. Abrir ou
+  > fechar esse microfone troca o fone para o modo de chamada e, no Linux (PipeWire), pode
+  > travar o som do fone para o navegador — o vídeo do YouTube para e não volta. Para destravar,
+  > desconecte e reconecte o fone. Capturar o "Monitor of …" do fone não tem esse problema.
 - **Atraso por entrada** — botão ⏱ em cada faixa: calibre automaticamente (o app toca notas
   de teste e mede o atraso, ideal para o "Monitor of …") ou ajuste à mão; o atraso é
   compensado no piano-roll e na pontuação.
