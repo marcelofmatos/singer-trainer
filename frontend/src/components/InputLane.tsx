@@ -38,6 +38,8 @@ export interface InputLaneProps {
   sampleWithoutTarget?: boolean;
   /** Per-pitch-class hit rates shown on the wheel only. */
   notePercents?: (number | null)[];
+  /** Piano-roll voice block fill, 0-1. */
+  pianoRollFill?: number;
 }
 
 const SCORE_TICK_MS = 100;
@@ -66,6 +68,7 @@ export function InputLane({
   wheelRef,
   sampleWithoutTarget = false,
   notePercents,
+  pianoRollFill,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
   // An extra lane with no device yet waits for a choice instead of opening the system default.
@@ -223,7 +226,12 @@ export function InputLane({
           <TunerView detectedNote={detected} targetMidiNumber={targetMidiNumber} micDisconnected={micDisconnected} />
         )}
         {visualization === 'piano-roll' && (
-          <PianoRollView detectedNote={detected} targetMidiNumber={targetMidiNumber} micDisconnected={micDisconnected} />
+          <PianoRollView
+            detectedNote={detected}
+            targetMidiNumber={targetMidiNumber}
+            micDisconnected={micDisconnected}
+            fill={pianoRollFill}
+          />
         )}
       </div>
       <div className="waveform-stage">

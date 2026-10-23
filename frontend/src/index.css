@@ -272,6 +272,12 @@ body {
   min-width: 3ch;
 }
 
+/* Up to "100%": reserve the width so the slider doesn't shift as the value changes. */
+.fill-value {
+  min-width: 4ch;
+  text-align: right;
+}
+
 .loop-toggle {
   display: inline-flex;
   align-items: center;

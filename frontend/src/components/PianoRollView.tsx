@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHROMATIC_NOTE_COLORS, pitchClassIndex, readableTextColor } from '../lib/chromaticWheel';
-import { appendSample, pitchRange, type RollSample } from '../lib/pianoRoll';
+import { appendSample, pitchRange, voiceBlocks, type RollSample } from '../lib/pianoRoll';
 import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
 import { SungNoteReadout } from './SungNoteReadout';
@@ -10,6 +10,8 @@ export interface PianoRollViewProps {
   detectedNote: NoteInfo | null;
   targetMidiNumber: number | null;
   micDisconnected: boolean;
+  /** How much of its note row each voice block fills, 0 (thin line at the exact pitch) to 1 (whole row). */
+  fill?: number;
 }
 
 const WINDOW_MS = 6000;
@@ -34,8 +36,8 @@ function labeledRows(rows: number[], rowHeight: number, fontSize: number): Set<n
   return labeled;
 }
 
-/** Pitch over time: target as bars, voice as a line colored by tuning, last 6 seconds. */
-export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected }: PianoRollViewProps) {
+/** Pitch over time: target as bars, voice as blocks colored by tuning, last 6 seconds. */
+export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected, fill = 1 }: PianoRollViewProps) {
   const latestRef = useRef({ detectedNote, targetMidiNumber });
   useEffect(() => {
     latestRef.current = { detectedNote, targetMidiNumber };
@@ -63,25 +65,17 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
   const x = (time: number) => LABEL_WIDTH + ((time - (now - WINDOW_MS)) / WINDOW_MS) * (WIDTH - LABEL_WIDTH);
   const y = (midi: number) => (high - midi) * rowHeight + rowHeight / 2;
 
-  const isVisible = (entry: RollSample) => entry.voice !== null && entry.voice >= low && entry.voice <= high;
 
-  // Consecutive samples with the same target form one bar; voice runs break on silence, out-of-range pitches and status changes.
+  // Consecutive samples with the same target form one bar.
   const targetBars: { start: number; end: number; midi: number }[] = [];
-  const voiceRuns: RollSample[][] = []; // consecutive in-range samples with one status
   samples.forEach((entry, index) => {
     if (entry.target !== null) {
       const last = targetBars[targetBars.length - 1];
       if (last && last.midi === entry.target && samples[index - 1]?.target === entry.target) last.end = entry.time;
       else targetBars.push({ start: entry.time, end: entry.time, midi: entry.target });
     }
-    if (isVisible(entry)) {
-      const previous = samples[index - 1];
-      const run = voiceRuns[voiceRuns.length - 1];
-      if (previous && isVisible(previous) && previous.status === entry.status) run.push(entry);
-      else if (previous && isVisible(previous)) voiceRuns.push([previous, entry]); // repeat the boundary point: no gap
-      else voiceRuns.push([entry]);
-    }
   });
+  const blocks = voiceBlocks(samples, fill, { low, high, rowHeight, tickMs: TICK_MS, left: LABEL_WIDTH, x });
 
   const rows = Array.from({ length: high - low + 1 }, (_, index) => high - index);
   const labeled = labeledRows(rows, rowHeight, LABEL_FONT_SIZE);
@@ -140,35 +134,19 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
             strokeWidth={1}
           />
         ))}
-        {voiceRuns.map((run) => {
-          const status = run[run.length - 1].status;
-          const color = status ? STATUS_COLORS[status] : '#ffffff';
-          // A run may start with the previous run's last point, but each sample ends at most one run.
-          const key = run[run.length - 1].time;
-          return run.length === 1 ? (
-            <circle
-              key={key}
-              data-testid="roll-voice"
-              data-status={status ?? undefined}
-              cx={x(run[0].time)}
-              cy={y(run[0].voice!)}
-              r={2}
-              fill={color}
-            />
-          ) : (
-            <polyline
-              key={key}
-              data-testid="roll-voice"
-              data-status={status ?? undefined}
-              points={run.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}
-              fill="none"
-              stroke={color}
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          );
-        })}
+        {blocks.map((block, index) => (
+          <rect
+            // Stateless rects: a positional key is enough, and x alone can repeat when the first block is clamped.
+            key={index}
+            data-testid="roll-voice"
+            data-status={block.status}
+            x={block.x}
+            y={block.y}
+            width={block.width}
+            height={block.height}
+            fill={STATUS_COLORS[block.status]}
+          />
+        ))}
       </svg>
     </div>
   );

@@ -34,3 +34,24 @@ export function nextVisualization(mode: VisualizationMode): VisualizationMode {
   const index = VISUALIZATION_MODES.findIndex((entry) => entry.id === mode);
   return VISUALIZATION_MODES[(index + 1) % VISUALIZATION_MODES.length].id;
 }
+
+const FILL_STORAGE_KEY = 'singer-trainer:piano-roll-fill';
+
+/** How much of its note row each piano-roll voice block fills, 0-1 (1 by default). */
+export function loadPianoRollFill(): number {
+  try {
+    const stored = localStorage.getItem(FILL_STORAGE_KEY);
+    const fill = stored === null || stored.trim() === '' ? NaN : Number(stored);
+    return fill >= 0 && fill <= 1 ? fill : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function savePianoRollFill(fill: number): void {
+  try {
+    localStorage.setItem(FILL_STORAGE_KEY, String(fill));
+  } catch {
+    // Private browsing / quota exceeded — the choice just won't be remembered.
+  }
+}

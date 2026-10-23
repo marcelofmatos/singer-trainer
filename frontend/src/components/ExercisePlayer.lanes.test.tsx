@@ -276,4 +276,23 @@ describe('ExercisePlayer input lanes', () => {
     expect(screen.getAllByLabelText('Teclado')).toHaveLength(2);
     expect(localStorage.getItem('singer-trainer:visualization')).toBe('keyboard');
   });
+
+  it('shows the fill control only in piano-roll, redraws with it and remembers it', async () => {
+    renderPlayer();
+    await flush();
+    expect(screen.queryByRole('slider', { name: 'Preenchimento' })).toBeNull();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Visualização' }), { target: { value: 'piano-roll' } });
+    const slider = screen.getByRole('slider', { name: 'Preenchimento' }) as HTMLInputElement;
+    expect(slider.value).toBe('100');
+    expect(screen.getByText('100%')).toBeDefined();
+    advance(200);
+    const rowHeight = Number(screen.getByTestId('roll-row-60').getAttribute('height'));
+    expect(Number(screen.getAllByTestId('roll-voice')[0].getAttribute('height'))).toBeCloseTo(rowHeight);
+    fireEvent.change(slider, { target: { value: '0' } });
+    expect(screen.getByText('0%')).toBeDefined();
+    expect(Number(screen.getAllByTestId('roll-voice')[0].getAttribute('height'))).toBeCloseTo(2.5);
+    expect(localStorage.getItem('singer-trainer:piano-roll-fill')).toBe('0');
+    fireEvent.change(screen.getByRole('combobox', { name: 'Visualização' }), { target: { value: 'tuner' } });
+    expect(screen.queryByRole('slider', { name: 'Preenchimento' })).toBeNull();
+  });
 });

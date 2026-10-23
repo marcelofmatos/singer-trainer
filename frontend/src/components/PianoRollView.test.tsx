@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { PianoRollView } from './PianoRollView';
 import { CHROMATIC_NOTE_COLORS, readableTextColor } from '../lib/chromaticWheel';
+import { STATUS_COLORS } from '../lib/tuningGauge';
 
 const note = (midiNumber: number, cents: number) => ({ noteName: 'X', octave: 0, midiNumber, cents });
 
@@ -9,7 +10,7 @@ describe('PianoRollView', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('draws the target as bars and the voice as a line over time', () => {
+  it('draws the target as bars and the voice as blocks over time', () => {
     const { rerender } = render(<PianoRollView detectedNote={note(60, 0)} targetMidiNumber={60} micDisconnected={false} />);
     act(() => {
       vi.advanceTimersByTime(200);
@@ -19,10 +20,12 @@ describe('PianoRollView', () => {
       vi.advanceTimersByTime(200);
     });
     expect(screen.getAllByTestId('roll-target').length).toBeGreaterThan(0);
-    expect(screen.getAllByTestId('roll-voice').length).toBeGreaterThan(0);
+    const voice = screen.getAllByTestId('roll-voice');
+    expect(voice.length).toBeGreaterThan(0);
+    expect(voice.every((block) => block.tagName === 'rect')).toBe(true);
   });
 
-  it('breaks the voice line during silence', () => {
+  it('breaks the voice blocks during silence', () => {
     const { rerender } = render(<PianoRollView detectedNote={note(60, 0)} targetMidiNumber={null} micDisconnected={false} />);
     act(() => {
       vi.advanceTimersByTime(150);
@@ -37,8 +40,8 @@ describe('PianoRollView', () => {
     });
     const pieces = screen.getAllByTestId('roll-voice');
     expect(pieces).toHaveLength(2);
-    const xs = (element: Element) => (element.getAttribute('points') ?? '').split(' ').map((pair) => Number(pair.split(',')[0]));
-    expect(Math.max(...xs(pieces[0]))).toBeLessThan(Math.min(...xs(pieces[1])));
+    const end = Number(pieces[0].getAttribute('x')) + Number(pieces[0].getAttribute('width'));
+    expect(end).toBeLessThan(Number(pieces[1].getAttribute('x')));
   });
 
   it('keeps the color of past stretches when the status changes', () => {
@@ -86,11 +89,50 @@ describe('PianoRollView', () => {
     act(() => {
       vi.advanceTimersByTime(100);
     });
-    const ys = screen
-      .getAllByTestId('roll-voice')
-      .flatMap((element) => (element.getAttribute('points') ?? `0,${element.getAttribute('cy')}`).split(' '))
-      .map((pair) => Number(pair.split(',')[1]));
-    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0);
+    const blocks = screen.getAllByTestId('roll-voice');
+    expect(Math.min(...blocks.map((block) => Number(block.getAttribute('y'))))).toBeGreaterThanOrEqual(0);
+    expect(Math.max(...blocks.map((block) => Number(block.getAttribute('y')) + Number(block.getAttribute('height'))))).toBeLessThanOrEqual(260);
+  });
+
+  it('draws nothing for the voice in silence', () => {
+    render(<PianoRollView detectedNote={null} targetMidiNumber={60} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(screen.queryAllByTestId('roll-voice')).toEqual([]);
+  });
+
+  it('colours each block by its tuning status', () => {
+    const { rerender } = render(<PianoRollView detectedNote={note(60, 0)} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    rerender(<PianoRollView detectedNote={note(60, 40)} targetMidiNumber={null} micDisconnected={false} />);
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+    const blocks = screen.getAllByTestId('roll-voice');
+    expect(blocks.map((block) => block.getAttribute('data-status'))).toEqual(['in-tune', 'off']);
+    expect(blocks.map((block) => block.getAttribute('fill'))).toEqual([STATUS_COLORS['in-tune'], STATUS_COLORS.off]);
+  });
+
+  it('fills the note row at fill 1 and draws a thin strip at fill 0', () => {
+    const heights = (fill: number) => {
+      const { unmount } = render(
+        <PianoRollView detectedNote={note(60, 20)} targetMidiNumber={null} micDisconnected={false} fill={fill} />
+      );
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      const rowHeight = Number(screen.getByTestId('roll-row-60').getAttribute('height'));
+      const result = screen.getAllByTestId('roll-voice').map((block) => Number(block.getAttribute('height')));
+      unmount();
+      return { rowHeight, result };
+    };
+    const full = heights(1);
+    expect(full.result.every((height) => Math.abs(height - full.rowHeight) < 1e-9)).toBe(true);
+    const thin = heights(0);
+    expect(thin.result.every((height) => Math.abs(height - 2.5) < 1e-9)).toBe(true);
   });
 
   it('colors the legend cell of each row with the note color from the wheel, not the chart', () => {

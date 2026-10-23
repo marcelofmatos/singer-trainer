@@ -40,8 +40,10 @@ import {
 } from '../lib/scoring';
 import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
 import {
+  loadPianoRollFill,
   loadVisualization,
   nextVisualization,
+  savePianoRollFill,
   saveVisualization,
   VISUALIZATION_MODES,
   type VisualizationMode,
@@ -119,6 +121,7 @@ export function ExercisePlayer({
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
   const [visualization, setVisualization] = useState(() => loadVisualization());
+  const [pianoRollFill, setPianoRollFill] = useState(() => loadPianoRollFill());
   const [referenceLaneId, setReferenceLaneId] = useState(() => loadReferenceLaneId());
   // The reference's current semitone; only changes when the semitone does, so cents jitter doesn't re-render.
   const [referenceTarget, setReferenceTarget] = useState<number | null>(null);
@@ -130,6 +133,7 @@ export function ExercisePlayer({
 
   useEffect(() => saveInputLanes(lanes), [lanes]);
   useEffect(() => saveVisualization(visualization), [visualization]);
+  useEffect(() => savePianoRollFill(pianoRollFill), [pianoRollFill]);
 
   // Read via refs inside the effect below so toggling these controls mid-playback
   // doesn't restart the currently-playing cycle from scratch.
@@ -575,6 +579,21 @@ export function ExercisePlayer({
             ))}
           </select>
         </label>
+        {visualization === 'piano-roll' && (
+          <label className="speed-control">
+            Preenchimento
+            <input
+              type="range"
+              aria-label="Preenchimento"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(pianoRollFill * 100)}
+              onChange={(event) => setPianoRollFill(Number(event.target.value) / 100)}
+            />
+            <span className="speed-value fill-value">{Math.round(pianoRollFill * 100)}%</span>
+          </label>
+        )}
       </div>
       <div className="exercise-info">
         <h2 className="exercise-title">{exercise.name}</h2>
@@ -642,6 +661,7 @@ export function ExercisePlayer({
               isReference={lane.id === effectiveReferenceId}
               onPlayNote={playNote}
               visualization={visualization}
+              pianoRollFill={pianoRollFill}
               wheelRef={lane.id === PRIMARY_LANE_ID ? wheelRef : undefined}
             />
           ))}
