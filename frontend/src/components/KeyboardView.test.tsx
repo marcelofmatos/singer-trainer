@@ -70,4 +70,19 @@ describe('KeyboardView', () => {
     act(() => ref.current!.navigate('first'));
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'C4' }));
   });
+
+  it('draws the target outline above every key, without catching clicks', () => {
+    renderKeyboard({ targetMidiNumber: 64 });
+    const outline = screen.getByTestId('keyboard-target-outline');
+    const svg = outline.closest('svg')!;
+    expect(svg.lastElementChild).toBe(outline);
+    expect(outline.getAttribute('pointer-events')).toBe('none');
+    expect(outline.getAttribute('fill')).toBe('none');
+    expect(outline.getAttribute('stroke-width')).toBe('3');
+  });
+
+  it('draws no target outline without a target or with the target off the keyboard', () => {
+    renderKeyboard({ targetMidiNumber: 40 });
+    expect(screen.queryByTestId('keyboard-target-outline')).toBeNull();
+  });
 });

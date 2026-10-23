@@ -30,4 +30,11 @@ describe('TunerView', () => {
     expect(screen.getByTestId('tuner-needle').getAttribute('data-status')).toBe('in-tune');
     expect(screen.getByText('Alvo: C4')).toBeDefined();
   });
+
+  it('carries the reading in its accessible name', () => {
+    const { rerender } = render(<TunerView detectedNote={note(69, 12)} targetMidiNumber={null} micDisconnected={false} />);
+    expect(screen.getByRole('img', { name: 'Afinador: A4 +12 ¢' })).toBeDefined();
+    rerender(<TunerView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    expect(screen.getByRole('img', { name: 'Afinador: sem voz' })).toBeDefined();
+  });
 });

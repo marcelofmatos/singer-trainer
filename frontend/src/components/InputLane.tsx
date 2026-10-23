@@ -5,7 +5,11 @@ import type { AudioInput } from '../hooks/useAudioInputs';
 import { PRIMARY_LANE_ID, type InputLaneConfig } from '../lib/inputLanes';
 import { isHit } from '../lib/scoring';
 import type { NoteInfo } from '../lib/noteUtils';
-import { PitchMeter, type PitchMeterHandle } from './PitchMeter';
+import type { VisualizationMode } from '../lib/visualization';
+import { KeyboardView } from './KeyboardView';
+import { PianoRollView } from './PianoRollView';
+import { PitchMeter, type NoteNavigatorHandle } from './PitchMeter';
+import { TunerView } from './TunerView';
 import { Waveform } from './Waveform';
 
 export interface InputLaneProps {
@@ -23,11 +27,16 @@ export interface InputLaneProps {
   onDeviceInUse: (laneId: string, deviceId: string | null, groupId: string | null) => void;
   onRemove?: () => void;
   onSample: (laneId: string, hit: boolean) => void;
-  onNoteClick: (pitchClass: number) => void;
-  wheelRef?: Ref<PitchMeterHandle>;
+  onPlayNote: (midiNumber: number) => void;
+  visualization: VisualizationMode;
+  /** Lowest key (a C) of the keyboard view. */
+  keyboardLowMidi: number;
+  wheelRef?: Ref<NoteNavigatorHandle>;
 }
 
 const SCORE_TICK_MS = 100;
+// The wheel is octave-agnostic, so a clicked bubble previews in this fixed octave (C4-B4).
+const WHEEL_OCTAVE_BASE_MIDI = 60;
 
 /** One audio input: its own pitch tracker, wheel, waveform and device controls. */
 export function InputLane({
@@ -44,7 +53,9 @@ export function InputLane({
   onDeviceInUse,
   onRemove,
   onSample,
-  onNoteClick,
+  onPlayNote,
+  visualization,
+  keyboardLowMidi,
   wheelRef,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
@@ -55,6 +66,7 @@ export function InputLane({
   });
   const name = isPrimary ? 'Microfone' : `Entrada ${position}`;
   const detected = tracker.status === 'listening' ? tracker.currentNote : null;
+  const micDisconnected = tracker.status === 'error';
   const selectedDeviceId = tracker.deviceId ?? lane.deviceId ?? '';
   // An unplugged device isn't listed; without a placeholder the select would show another device's name.
   const deviceMissing = selectedDeviceId !== '' && !audioInputs.some((input) => input.deviceId === selectedDeviceId);
@@ -161,21 +173,39 @@ export function InputLane({
       {tracker.status === 'off' && !needsDevice && <p className="status-message">Mic desativado</p>}
       {needsDevice && audioInputs.length === 0 && <p className="status-message">Escolha um dispositivo</p>}
 
-      <div className="wheel-stage">
-        <PitchMeter
-          ref={wheelRef}
-          detectedNote={detected}
-          targetMidiNumber={targetMidiNumber}
-          micDisconnected={tracker.status === 'error'}
-          onNoteClick={onNoteClick}
-        />
+      <div className={`view-stage view-${visualization}${visualization === 'wheel' ? ' wheel-stage' : ''}`}>
+        {visualization === 'wheel' && (
+          <PitchMeter
+            ref={wheelRef}
+            detectedNote={detected}
+            targetMidiNumber={targetMidiNumber}
+            micDisconnected={micDisconnected}
+            onNoteClick={(pitchClass) => onPlayNote(WHEEL_OCTAVE_BASE_MIDI + pitchClass)}
+          />
+        )}
+        {visualization === 'keyboard' && (
+          <KeyboardView
+            ref={wheelRef}
+            lowMidi={keyboardLowMidi}
+            detectedNote={detected}
+            targetMidiNumber={targetMidiNumber}
+            micDisconnected={micDisconnected}
+            onPlayNote={onPlayNote}
+          />
+        )}
+        {visualization === 'tuner' && (
+          <TunerView detectedNote={detected} targetMidiNumber={targetMidiNumber} micDisconnected={micDisconnected} />
+        )}
+        {visualization === 'piano-roll' && (
+          <PianoRollView detectedNote={detected} targetMidiNumber={targetMidiNumber} micDisconnected={micDisconnected} />
+        )}
       </div>
       <div className="waveform-stage">
         <Waveform
           samples={tracker.waveform}
           detectedNote={detected}
           targetMidiNumber={targetMidiNumber}
-          micDisconnected={tracker.status === 'error'}
+          micDisconnected={micDisconnected}
         />
       </div>
     </div>

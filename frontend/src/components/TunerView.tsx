@@ -24,12 +24,18 @@ export function TunerView({ detectedNote, targetMidiNumber, micDisconnected }: T
   const percent = detectedNote ? Math.round(centsToGaugePercent(detectedNote.cents)) : null;
 
   return (
-    <div className={micDisconnected ? 'tuner-view is-disconnected' : 'tuner-view'} role="img" aria-label="Afinador cromático">
+    <div
+      className={micDisconnected ? 'tuner-view is-disconnected' : 'tuner-view'}
+      role="img"
+      aria-label={
+        detectedNote ? `Afinador: ${noteLabel(detectedNote.midiNumber)} ${formatCents(detectedNote.cents)}` : 'Afinador: sem voz'
+      }
+    >
       <div className="tuner-note" data-testid="tuner-note">
         {detectedNote ? noteLabel(detectedNote.midiNumber) : '—'}
       </div>
       <div className="tuner-scale">
-        <span className="tuner-scale-center" />
+        <span className="tuner-scale-center" aria-hidden="true" />
         {percent !== null && status && (
           <span
             className="tuner-needle"

@@ -43,7 +43,9 @@ function renderLane(overrides: Partial<InputLaneProps> = {}) {
     onSelectDevice: vi.fn(),
     onDeviceInUse: vi.fn(),
     onSample: vi.fn(),
-    onNoteClick: vi.fn(),
+    onPlayNote: vi.fn(),
+    visualization: 'wheel',
+    keyboardLowMidi: 60,
     ...overrides,
   };
   render(<InputLane {...props} />);
@@ -170,5 +172,16 @@ describe('InputLane', () => {
     tracker.state = { ...tracker.state, status: 'off', deviceId: null };
     renderLane({ micEnabled: false });
     expect(screen.getByText('Mic desativado')).toBeDefined();
+  });
+
+  it('renders the chosen visualization', () => {
+    renderLane({ visualization: 'tuner' });
+    expect(screen.getByRole('img', { name: /Afinador/ })).toBeDefined();
+  });
+
+  it('plays wheel bubbles in the fourth octave', () => {
+    const props = renderLane({ visualization: 'wheel' });
+    fireEvent.click(screen.getByTestId('note-bubble-A'));
+    expect(props.onPlayNote).toHaveBeenCalledWith(69);
   });
 });

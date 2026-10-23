@@ -20,9 +20,10 @@ describe('App', () => {
 
   it('shows the speed control next to the exercise selector', () => {
     render(<App />);
-    const toolbar = screen.getByRole('toolbar', { name: 'Exercício e velocidade' });
+    const toolbar = screen.getByRole('toolbar', { name: 'Opções do exercício' });
     expect(within(toolbar).getByLabelText('Exercício')).toBeDefined();
     expect(within(toolbar).getByRole('slider', { name: /velocidade/i })).toBeDefined();
+    expect(within(toolbar).getByRole('combobox', { name: 'Visualização' })).toBeDefined();
   });
 
   it('shows the first exercise selected and displayed by default', () => {

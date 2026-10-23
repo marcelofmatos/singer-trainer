@@ -76,6 +76,7 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
     return { midi, black, x };
   });
   const width = (whiteIndex + 1) * WHITE_KEY_WIDTH;
+  const targetKey = layout.find((key) => key.midi === targetMidiNumber);
   const ordered = [...layout.filter((key) => !key.black), ...layout.filter((key) => key.black)];
 
   return (
@@ -116,12 +117,27 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
                 height={black ? BLACK_KEY_HEIGHT : WHITE_KEY_HEIGHT}
                 rx={2}
                 fill={lit && status ? STATUS_COLORS[status] : black ? '#1e1a17' : '#f2ece4'}
-                stroke={isTarget ? 'var(--color-accent)' : '#14110f'}
-                strokeWidth={isTarget ? 3 : 1}
+                stroke="#14110f"
+                strokeWidth={1}
               />
             </g>
           );
         })}
+        {/* Drawn after every key so neighbouring keys can't cover the outline. */}
+        {targetKey && (
+          <rect
+            data-testid="keyboard-target-outline"
+            x={targetKey.x}
+            y={0}
+            width={targetKey.black ? BLACK_KEY_WIDTH : WHITE_KEY_WIDTH}
+            height={targetKey.black ? BLACK_KEY_HEIGHT : WHITE_KEY_HEIGHT}
+            rx={2}
+            fill="none"
+            stroke="var(--color-accent)"
+            strokeWidth={3}
+            pointerEvents="none"
+          />
+        )}
       </svg>
     </div>
   );

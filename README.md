@@ -37,6 +37,10 @@ quão perto você está da nota certa.
   seletor de dispositivo e liga/desliga; a montagem fica salva, e uma entrada
   desconectada aparece como tal até voltar. A tecla M liga/desliga o microfone da
   primeira entrada (as outras usam o próprio botão).
+- **Visualizações** — além da roda cromática (padrão, mais didática), escolha na barra do
+  topo (ou com V) entre **piano-roll** (altura da voz ao longo do tempo sobre a nota-alvo),
+  **afinador cromático** (nota grande e ponteiro de ±50 cents) e **teclado** de duas
+  oitavas com a tecla cantada acesa. A escolha fica salva.
 
 ## Rodando localmente
 

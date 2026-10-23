@@ -18,9 +18,16 @@ import {
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
 import { addSample, addTallies, EMPTY_TALLY, type ScoreTally } from '../lib/scoring';
 import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
+import {
+  loadVisualization,
+  nextVisualization,
+  saveVisualization,
+  VISUALIZATION_MODES,
+  type VisualizationMode,
+} from '../lib/visualization';
 import { InputLane } from './InputLane';
 import { KeyboardHelp } from './KeyboardHelp';
-import { type PitchMeterHandle } from './PitchMeter';
+import { type NoteNavigatorHandle } from './PitchMeter';
 import { ScoreBoard } from './ScoreBoard';
 import { ScoreHistory } from './ScoreHistory';
 
@@ -46,8 +53,6 @@ const REPEATABLE_ACTIONS: ShortcutAction[] = [
   'lessSensitive',
   'moreSensitive',
 ];
-// The wheel is octave-agnostic, so a clicked bubble always previews in this fixed octave (C4-B4).
-const PREVIEW_OCTAVE_BASE_MIDI = 60;
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 // Seconds each lane sample stands for; must match InputLane's 100ms scoring tick.
 const SAMPLE_SECONDS = 0.1;
@@ -83,9 +88,11 @@ export function ExercisePlayer({
   const [history, setHistory] = useState(() => loadScoreHistory());
   const [cycle, setCycle] = useState(0);
   const [toneError, setToneError] = useState<string | null>(null);
+  const [visualization, setVisualization] = useState(() => loadVisualization());
   const audioInputs = useAudioInputs(null);
 
   useEffect(() => saveInputLanes(lanes), [lanes]);
+  useEffect(() => saveVisualization(visualization), [visualization]);
 
   // Read via refs inside the effect below so toggling these controls mid-playback
   // doesn't restart the currently-playing cycle from scratch.
@@ -110,7 +117,7 @@ export function ExercisePlayer({
 
   const gainRef = useRef<GainNode | null>(null);
   const mutedRef = useRef(muted);
-  const wheelRef = useRef<PitchMeterHandle>(null);
+  const wheelRef = useRef<NoteNavigatorHandle>(null);
   useEffect(() => {
     mutedRef.current = muted;
     const gain = gainRef.current;
@@ -181,6 +188,12 @@ export function ExercisePlayer({
   }, [scaledExercise, cycle]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
+  // The keyboard starts at the C at or below the exercise's lowest note.
+  const keyboardLowMidi = useMemo(
+    () =>
+      exercise.notes.length > 0 ? Math.floor(Math.min(...exercise.notes.map((n) => n.midiNumber)) / 12) * 12 : 48,
+    [exercise]
+  );
 
   // A lane on the system default (or an alias like "default") is named after the real device it opened.
   function laneLabel(lane: InputLaneConfig, position: number): string {
@@ -280,11 +293,11 @@ export function ExercisePlayer({
     }
   }
 
-  function handleNoteClick(pitchClass: number) {
+  function playNote(midiNumber: number) {
     if (muted) return;
     try {
       const previewContext = new AudioContext();
-      playPreviewTone(previewContext, PREVIEW_OCTAVE_BASE_MIDI + pitchClass);
+      playPreviewTone(previewContext, midiNumber);
       setTimeout(() => previewContext.close(), PREVIEW_CONTEXT_LIFETIME_MS);
       setToneError(null);
     } catch (err) {
@@ -351,6 +364,9 @@ export function ExercisePlayer({
         case 'showHistory':
           setHistoryOpen(true);
           break;
+        case 'nextView':
+          setVisualization((mode) => nextVisualization(mode));
+          break;
       }
     };
   });
@@ -375,7 +391,7 @@ export function ExercisePlayer({
         })}
         onOpenHistory={() => setHistoryOpen(true)}
       />
-      <div className="exercise-toolbar" role="toolbar" aria-label="Exercício e velocidade">
+      <div className="exercise-toolbar" role="toolbar" aria-label="Opções do exercício">
         {exerciseSelect}
         <label className="speed-control">
           Velocidade
@@ -388,6 +404,21 @@ export function ExercisePlayer({
             onChange={(event) => setPlaybackRate(Number(event.target.value))}
           />
           <span className="speed-value">{playbackRate.toFixed(2)}x</span>
+        </label>
+        <label className="speed-control">
+          Visualização
+          <select
+            className="view-select"
+            aria-label="Visualização"
+            value={visualization}
+            onChange={(event) => setVisualization(event.target.value as VisualizationMode)}
+          >
+            {VISUALIZATION_MODES.map((mode) => (
+              <option key={mode.id} value={mode.id}>
+                {mode.label}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
       <div className="exercise-info">
@@ -419,7 +450,9 @@ export function ExercisePlayer({
               onDeviceInUse={handleDeviceInUse}
               onRemove={lane.id === PRIMARY_LANE_ID ? undefined : () => removeLane(lane.id)}
               onSample={handleSample}
-              onNoteClick={handleNoteClick}
+              onPlayNote={playNote}
+              visualization={visualization}
+              keyboardLowMidi={keyboardLowMidi}
               wheelRef={lane.id === PRIMARY_LANE_ID ? wheelRef : undefined}
             />
           ))}

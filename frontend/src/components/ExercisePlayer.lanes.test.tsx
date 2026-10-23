@@ -259,4 +259,21 @@ describe('ExercisePlayer input lanes', () => {
     expect(screen.getByRole('button', { name: 'Ligar microfone' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Desligar entrada 2' })).toBeDefined();
   });
+
+  it('switches every lane to the chosen visualization, with V and remembered', async () => {
+    localStorage.setItem(
+      'singer-trainer:input-lanes',
+      JSON.stringify([
+        { id: 'primary', deviceId: 'mic' },
+        { id: 'lane-2', deviceId: 'monitor' },
+      ])
+    );
+    renderPlayer();
+    await flush();
+    fireEvent.change(screen.getByRole('combobox', { name: 'Visualização' }), { target: { value: 'tuner' } });
+    expect(screen.getAllByRole('img', { name: /Afinador/ })).toHaveLength(2);
+    fireEvent.keyDown(document.body, { key: 'v' });
+    expect(screen.getAllByLabelText('Teclado')).toHaveLength(2);
+    expect(localStorage.getItem('singer-trainer:visualization')).toBe('keyboard');
+  });
 });
