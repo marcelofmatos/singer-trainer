@@ -8,21 +8,32 @@ describe('downsampleWaveform', () => {
     expect(result.length).toBe(4);
   });
 
-  it('picks values at fixed stride positions, preserving sign', () => {
-    // buffer index:  0    1    2    3    4    5    6    7
-    const buffer = Float32Array.from([0, 0.1, -0.2, 0.3, -0.4, 0.5, -0.6, 0.7]);
-    // 8 samples, 4 points -> stride 2 -> indices 0, 2, 4, 6
+  it('picks the largest-magnitude sample of each chunk, preserving sign', () => {
+    const buffer = Float32Array.from([0, 0.1, -0.2, 0.3, -0.4, 0.5, -0.9, 0.7]);
+    // 8 samples, 4 points -> chunks of 2
     const result = downsampleWaveform(buffer, 4);
     expect(result.length).toBe(4);
-    expect(result[0]).toBe(0);
-    expect(result[1]).toBeCloseTo(-0.2, 5);
-    expect(result[2]).toBeCloseTo(-0.4, 5);
-    expect(result[3]).toBeCloseTo(-0.6, 5);
+    expect(result[0]).toBeCloseTo(0.1, 5);
+    expect(result[1]).toBeCloseTo(0.3, 5);
+    expect(result[2]).toBeCloseTo(0.5, 5);
+    expect(result[3]).toBeCloseTo(-0.9, 5);
   });
 
   it('returns the buffer as-is when points equals buffer length', () => {
     const buffer = Float32Array.from([1, 2, 3, 4]);
     const result = downsampleWaveform(buffer, 4);
     expect(result).toEqual([1, 2, 3, 4]);
+  });
+
+  it('keeps the peak of each chunk, not a strided pick', () => {
+    const buffer = new Float32Array(16);
+    buffer[5] = 0.8; // middle of chunk 1 (indices 4-7); a stride-4 pick would hit 0
+    buffer[10] = -0.9; // chunk 2 (indices 8-11), negative peak keeps its sign
+    expect(downsampleWaveform(buffer, 4)).toEqual([
+      0,
+      expect.closeTo(0.8, 5),
+      expect.closeTo(-0.9, 5),
+      0,
+    ]);
   });
 });

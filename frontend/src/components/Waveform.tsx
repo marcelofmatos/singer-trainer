@@ -10,6 +10,8 @@ export interface WaveformProps {
 }
 
 const HEIGHT = 80;
+const DISPLAY_PEAK = 0.9;
+const NOISE_FLOOR = 0.02;
 const NEUTRAL_COLOR = '#a89e93'; // --color-text-muted
 
 export function Waveform({ samples, detectedNote, targetMidiNumber, micDisconnected }: WaveformProps) {
@@ -17,10 +19,14 @@ export function Waveform({ samples, detectedNote, targetMidiNumber, micDisconnec
   const color = status ? STATUS_COLORS[status] : NEUTRAL_COLOR;
   const width = Math.max(samples.length - 1, 1);
 
+  const maxAbs = samples.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  const gain = DISPLAY_PEAK / Math.max(maxAbs, NOISE_FLOOR);
+  const scaled = (value: number) => Math.max(-1, Math.min(1, value * gain));
+
   const points =
     micDisconnected || samples.length === 0
       ? ''
-      : samples.map((value, index) => `${index},${(HEIGHT / 2 - value * (HEIGHT / 2)).toFixed(2)}`).join(' ');
+      : samples.map((value, index) => `${index},${(HEIGHT / 2 - scaled(value) * (HEIGHT / 2)).toFixed(2)}`).join(' ');
 
   return (
     <svg

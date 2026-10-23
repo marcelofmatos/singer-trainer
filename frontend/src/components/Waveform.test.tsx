@@ -26,8 +26,30 @@ describe('Waveform', () => {
         micDisconnected={false}
       />
     );
-    // HEIGHT=80: value=1 -> y=0 (top), value=-1 -> y=80 (bottom), value=0 -> y=40 (middle)
-    expect(screen.getByTestId('waveform-trace').getAttribute('points')).toBe('0,0.00 1,80.00 2,40.00');
+    // HEIGHT=80, display gain 0.9/1: value=1 -> y=4, value=-1 -> y=76, value=0 -> y=40 (middle)
+    expect(screen.getByTestId('waveform-trace').getAttribute('points')).toBe('0,4.00 1,76.00 2,40.00');
+  });
+
+  const ys = (testSamples: number[]) => {
+    render(
+      <Waveform samples={testSamples} detectedNote={null} targetMidiNumber={null} micDisconnected={false} />
+    );
+    return screen
+      .getByTestId('waveform-trace')
+      .getAttribute('points')!
+      .split(' ')
+      .map((p) => Number(p.split(',')[1]));
+  };
+
+  it('auto-gains quiet singing so it fills the height', () => {
+    const y = ys([0, 0.05, -0.05, 0.02]);
+    expect(Math.min(...y)).toBeLessThanOrEqual(8);
+    expect(Math.max(...y)).toBeGreaterThanOrEqual(72);
+  });
+
+  it('keeps near-silent noise close to the center line', () => {
+    const y = ys([0.004, -0.004, 0.002]);
+    for (const v of y) expect(Math.abs(v - 40)).toBeLessThan(8);
   });
 
   it('renders no trace when there are no samples yet', () => {
