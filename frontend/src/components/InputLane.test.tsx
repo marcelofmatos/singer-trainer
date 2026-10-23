@@ -45,7 +45,6 @@ function laneProps(overrides: Partial<InputLaneProps> = {}): InputLaneProps {
     onSample: vi.fn(),
     onPlayNote: vi.fn(),
     visualization: 'wheel',
-    keyboardLowMidi: 60,
     ...overrides,
   };
 }

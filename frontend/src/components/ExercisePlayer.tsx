@@ -188,12 +188,6 @@ export function ExercisePlayer({
   }, [scaledExercise, cycle]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
-  // The keyboard starts at the C at or below the exercise's lowest note.
-  const keyboardLowMidi = useMemo(
-    () =>
-      exercise.notes.length > 0 ? Math.floor(Math.min(...exercise.notes.map((n) => n.midiNumber)) / 12) * 12 : 48,
-    [exercise]
-  );
 
   // A lane on the system default (or an alias like "default") is named after the real device it opened.
   function laneLabel(lane: InputLaneConfig, position: number): string {
@@ -452,7 +446,6 @@ export function ExercisePlayer({
               onSample={handleSample}
               onPlayNote={playNote}
               visualization={visualization}
-              keyboardLowMidi={keyboardLowMidi}
               wheelRef={lane.id === PRIMARY_LANE_ID ? wheelRef : undefined}
             />
           ))}

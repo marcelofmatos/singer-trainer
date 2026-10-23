@@ -602,12 +602,55 @@ body {
 }
 
 .keyboard-readout {
-  display: flex;
-  justify-content: space-between;
-  min-height: 1.2rem;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   font-size: 0.8rem;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.keyboard-out-of-range-slot:last-child {
+  text-align: right;
+}
+
+.keyboard-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Fixed line heights keep the keyboard still while the note comes and goes. */
+.keyboard-center-note {
+  min-height: 2.4rem;
+  line-height: 2.4rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.keyboard-cents {
+  min-height: 1.1rem;
+  line-height: 1.1rem;
+}
+
+.keyboard-window {
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+/* The full C2–C6 keyboard (29 white keys) seen through a 14-white-key window. */
+.keyboard-keys {
+  display: block;
+  width: calc(29 / 14 * 100%);
+  height: auto;
+  transition: transform 250ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keyboard-keys {
+    transition: none;
+  }
 }
 
 .keyboard-view g[role='button']:focus {

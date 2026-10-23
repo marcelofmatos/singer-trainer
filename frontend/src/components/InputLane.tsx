@@ -29,8 +29,6 @@ export interface InputLaneProps {
   onSample: (laneId: string, hit: boolean) => void;
   onPlayNote: (midiNumber: number) => void;
   visualization: VisualizationMode;
-  /** Lowest key (a C) of the keyboard view. */
-  keyboardLowMidi: number;
   wheelRef?: Ref<NoteNavigatorHandle>;
 }
 
@@ -55,7 +53,6 @@ export function InputLane({
   onSample,
   onPlayNote,
   visualization,
-  keyboardLowMidi,
   wheelRef,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
@@ -188,7 +185,6 @@ export function InputLane({
         {visualization === 'keyboard' && (
           <KeyboardView
             ref={wheelRef}
-            lowMidi={keyboardLowMidi}
             detectedNote={detected}
             targetMidiNumber={targetMidiNumber}
             micDisconnected={micDisconnected}
