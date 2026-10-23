@@ -45,6 +45,9 @@ quão perto você está da nota certa.
   entrada (ex.: o "Monitor of …" com um vídeo do YouTube tocando) como referência: as notas
   dela viram o alvo das outras faixas, e a pontuação vale enquanto a referência canta
   (acerto se você cantar a mesma nota, em qualquer oitava, até 0,5 s depois).
+- **Exercício livre** — cante junto com uma música tocando em outra aba (de fone): cada
+  entrada é medida contra a nota mais próxima, o tempo só conta enquanto há voz, e a roda
+  mostra a % de acerto de cada nota; o histórico guarda o acerto por nota de cada entrada.
 
 ## Rodando localmente
 

@@ -75,6 +75,46 @@ describe('ScoreHistory', () => {
     expect(records.textContent).toContain('20%');
   });
 
+  it('shows the free exercise hit rate per note and input', () => {
+    const tallies = (pitchClass: number, target: number, hit: number) =>
+      Array.from({ length: 12 }, (_, index) =>
+        index === pitchClass ? { targetSeconds: target, hitSeconds: hit } : { targetSeconds: 0, hitSeconds: 0 }
+      );
+    render(
+      <ScoreHistory
+        open
+        onClose={() => {}}
+        history={[
+          record({ exerciseId: 'livre', exerciseName: 'Exercício livre', noteTallies: tallies(9, 10, 8) }),
+          record({
+            exerciseId: 'livre',
+            exerciseName: 'Exercício livre',
+            inputId: 'lane-2',
+            inputLabel: 'Headset',
+            noteTallies: tallies(0, 4, 1),
+          }),
+        ]}
+      />
+    );
+    const table = screen.getByRole('table', { name: 'Exercício livre — acerto por nota' });
+    const [header, ...rows] = within(table).getAllByRole('row');
+    expect(within(header).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
+      'Entrada', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B',
+    ]);
+    expect(rows).toHaveLength(2);
+    const micCells = within(rows[0]).getAllByRole('cell').map((cell) => cell.textContent);
+    expect(within(rows[0]).getByRole('rowheader').textContent).toBe('Microfone');
+    expect(micCells[9]).toBe('80%');
+    expect(micCells[0]).toBe('—');
+    expect(within(rows[1]).getByRole('rowheader').textContent).toBe('Headset');
+    expect(within(rows[1]).getAllByRole('cell')[0].textContent).toBe('25%');
+  });
+
+  it('has no per-note table without free exercise records', () => {
+    render(<ScoreHistory open onClose={() => {}} history={[record({})]} />);
+    expect(screen.queryByRole('table', { name: 'Exercício livre — acerto por nota' })).toBeNull();
+  });
+
   it('calls onClose from the close button', () => {
     const onClose = vi.fn();
     render(<ScoreHistory open onClose={onClose} history={[]} />);

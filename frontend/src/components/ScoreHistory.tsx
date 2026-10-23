@@ -1,7 +1,8 @@
 // frontend/src/components/ScoreHistory.tsx
 import { useEffect, useRef } from 'react';
+import { CHROMATIC_NOTE_NAMES } from '../lib/chromaticWheel';
 import { formatSeconds, hitPercent } from '../lib/scoring';
-import { bestScores, type ScoreRecord } from '../lib/scoreHistory';
+import { bestScores, freeNotePercentsByInput, type ScoreRecord } from '../lib/scoreHistory';
 
 export interface ScoreHistoryProps {
   open: boolean;
@@ -10,6 +11,7 @@ export interface ScoreHistoryProps {
 }
 
 const RECENT_COUNT = 50;
+const FREE_NOTES_TITLE = 'Exercício livre — acerto por nota';
 
 /** Native modal <dialog> with the best score per exercise and the latest completed passes. */
 export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
@@ -24,6 +26,7 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
 
   const firstShown = Math.max(0, history.length - RECENT_COUNT);
   const recent = history.slice(firstShown).reverse();
+  const freeNotes = freeNotePercentsByInput(history);
 
   return (
     <dialog ref={dialogRef} className="app-dialog" aria-labelledby="score-history-title" onClose={onClose}>
@@ -48,6 +51,33 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
               ))}
             </tbody>
           </table>
+          {freeNotes.length > 0 && (
+            <div className="score-history-scroll">
+              <table className="score-history-table score-history-notes" aria-label={FREE_NOTES_TITLE}>
+                <caption>{FREE_NOTES_TITLE}</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Entrada</th>
+                    {CHROMATIC_NOTE_NAMES.map((name) => (
+                      <th key={name} scope="col">
+                        {name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {freeNotes.map((row) => (
+                    <tr key={row.inputId}>
+                      <th scope="row">{row.inputLabel ?? 'Microfone'}</th>
+                      {row.percents.map((percent, index) => (
+                        <td key={CHROMATIC_NOTE_NAMES[index]}>{percent === null ? '—' : `${percent}%`}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <table className="score-history-table" aria-label="Últimas passadas">
             <caption>Últimas passadas</caption>
             <thead>

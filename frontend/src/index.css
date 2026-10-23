@@ -469,6 +469,27 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.score-history-scroll {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.score-history-scroll .score-history-notes {
+  margin-bottom: 0;
+}
+
+.score-history-table.score-history-notes th,
+.score-history-table.score-history-notes td {
+  padding: 0.2rem 0.3rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-history-table.score-history-notes th[scope='row'] {
+  text-align: left;
+  white-space: nowrap;
+}
+
 .score-history-empty {
   color: var(--color-text-muted);
 }

@@ -26,7 +26,18 @@ import {
   saveReferenceLaneId,
   type ReferenceSample,
 } from '../lib/referenceMatch';
-import { addSample, addTallies, EMPTY_TALLY, isHit, type ScoreTally } from '../lib/scoring';
+import {
+  addNoteSample,
+  addSample,
+  addTallies,
+  EMPTY_NOTE_TALLIES,
+  EMPTY_TALLY,
+  hitPercent,
+  isHit,
+  isHitNearest,
+  type NoteTallies,
+  type ScoreTally,
+} from '../lib/scoring';
 import { appendScoreRecord, loadScoreHistory, totalTallyForInput } from '../lib/scoreHistory';
 import {
   loadVisualization,
@@ -75,6 +86,10 @@ export function ExercisePlayer({
 }: ExercisePlayerProps) {
   // The reference mode has no tone or clock: another input's live notes are the target.
   const isReferenceMode = exercise.mode === 'reference';
+  // The free mode has no tone or clock either: each lane is scored against its nearest note.
+  const isFreeMode = exercise.mode === 'free';
+  // Shared by both: no tone/clock, the running stretch is recorded on pause, leave or hide.
+  const isContinuousMode = isReferenceMode || isFreeMode;
   const [elapsed, setElapsed] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(() => loadPlaybackPreferences().playbackRate);
   const [loop, setLoop] = useState(() => loadPlaybackPreferences().loop);
@@ -96,6 +111,9 @@ export function ExercisePlayer({
   // Mirrors passTallies synchronously: a lane may sample in the same tick the pass ends, before
   // a re-render, and that sample must still be counted in the pass being completed.
   const passTalliesRef = useRef<Record<string, ScoreTally>>({});
+  // Free mode: the pass split per pitch class, kept like passTallies (state + synchronous ref).
+  const [passNoteTallies, setPassNoteTallies] = useState<Record<string, NoteTallies>>({});
+  const passNoteTalliesRef = useRef<Record<string, NoteTallies>>({});
   const [sessionTallies, setSessionTallies] = useState<Record<string, ScoreTally>>({});
   const [history, setHistory] = useState(() => loadScoreHistory());
   const [cycle, setCycle] = useState(0);
@@ -148,21 +166,27 @@ export function ExercisePlayer({
     savePlaybackPreferences({ playbackRate, loop, micSensitivity });
   }, [playbackRate, loop, micSensitivity]);
 
-  // The speed has no effect in reference mode; keeping it out stops it from resetting the running pass.
-  const timingRate = isReferenceMode ? 1 : playbackRate;
+  // The speed has no effect in continuous modes; keeping it out stops it from resetting the running pass.
+  const timingRate = isContinuousMode ? 1 : playbackRate;
   const scaledExercise = useMemo(
     () => scaleExerciseTiming(exercise, timingRate),
     [exercise, timingRate]
   );
 
+  function resetPassTallies() {
+    passTalliesRef.current = {};
+    setPassTallies({});
+    passNoteTalliesRef.current = {};
+    setPassNoteTallies({});
+  }
+
   useEffect(() => {
-    if (isReferenceMode) {
+    if (isContinuousMode) {
       // An empty exercise would "end" on the first poll, so there is no tone or clock at all.
       setToneError(null);
       setElapsed(0);
       setEnded(false);
-      passTalliesRef.current = {};
-      setPassTallies({});
+      resetPassTallies();
       return;
     }
 
@@ -185,8 +209,7 @@ export function ExercisePlayer({
       setToneError(null);
       setElapsed(0);
       setEnded(false);
-      passTalliesRef.current = {};
-      setPassTallies({});
+      resetPassTallies();
 
       pollTimer = setInterval(() => {
         if (!audioContext) return;
@@ -216,7 +239,7 @@ export function ExercisePlayer({
       audioContextRef.current = null;
       gainRef.current = null;
     };
-  }, [scaledExercise, cycle, isReferenceMode]);
+  }, [scaledExercise, cycle, isContinuousMode]);
 
   const targetNote = noteAtTime(scaledExercise, elapsed);
 
@@ -256,8 +279,10 @@ export function ExercisePlayer({
   // Synced before the lanes' (passive) effects run, so their reports and samples see this render's values.
   const referenceIdRef = useRef(effectiveReferenceId);
   const exerciseTargetRef = useRef<number | null>(null);
+  const isFreeModeRef = useRef(isFreeMode);
   useLayoutEffect(() => {
     referenceIdRef.current = effectiveReferenceId;
+    isFreeModeRef.current = isFreeMode;
     exerciseTargetRef.current = targetNote?.midiNumber ?? null;
   });
 
@@ -305,6 +330,8 @@ export function ExercisePlayer({
     // Its unfinished pass goes too, so it can't leak into the session totals.
     passTalliesRef.current = withoutLane(passTalliesRef.current, laneId);
     setPassTallies(passTalliesRef.current);
+    passNoteTalliesRef.current = withoutLane(passNoteTalliesRef.current, laneId);
+    setPassNoteTallies(passNoteTalliesRef.current);
   }
 
   const handleDeviceInUse = useCallback((laneId: string, deviceId: string | null, groupId: string | null) => {
@@ -325,7 +352,17 @@ export function ExercisePlayer({
 
   const handleSample = useCallback((laneId: string, detected: NoteInfo | null) => {
     let hit: boolean;
-    if (referenceIdRef.current === null) {
+    if (isFreeModeRef.current) {
+      // Only time with a voice counts; the silence between phrases is neither a hit nor a miss.
+      if (!detected) return;
+      hit = isHitNearest(detected);
+      const notes = passNoteTalliesRef.current;
+      passNoteTalliesRef.current = {
+        ...notes,
+        [laneId]: addNoteSample(notes[laneId] ?? EMPTY_NOTE_TALLIES, detected.midiNumber, SAMPLE_SECONDS, hit),
+      };
+      setPassNoteTallies(passNoteTalliesRef.current);
+    } else if (referenceIdRef.current === null) {
       hit = isHit(detected, exerciseTargetRef.current);
     } else {
       const now = Date.now();
@@ -340,12 +377,13 @@ export function ExercisePlayer({
     setPassTallies(passTalliesRef.current);
   }, []);
 
-  // Called when a pass ends (the playback poll; in reference mode pausing, leaving or hiding the
+  // Called when a pass ends (the playback poll; in continuous modes pausing, leaving or hiding the
   // page): each lane's pass moves into its session and the stored history (and leaves the live
   // pass tallies, so nothing is counted twice). The reference lane is never recorded.
   useEffect(() => {
     completePassRef.current = () => {
       const tallies = { ...passTalliesRef.current };
+      const noteTallies = passNoteTalliesRef.current;
       if (effectiveReferenceId) delete tallies[effectiveReferenceId];
       let latest = history;
       lanes.forEach((lane, index) => {
@@ -359,6 +397,7 @@ export function ExercisePlayer({
           inputId: lane.id,
           inputLabel: laneLabel(lane, index + 1),
           ...tally,
+          ...(isFreeMode ? { noteTallies: noteTallies[lane.id] ?? EMPTY_NOTE_TALLIES } : {}),
         });
       });
       setHistory(latest);
@@ -369,13 +408,12 @@ export function ExercisePlayer({
         }
         return next;
       });
-      passTalliesRef.current = {};
-      setPassTallies({});
+      resetPassTallies();
     };
   });
 
   useEffect(() => {
-    if (!isReferenceMode) return;
+    if (!isContinuousMode) return;
     const recordPass = () => completePassRef.current();
     const recordIfHidden = () => {
       if (document.visibilityState === 'hidden') recordPass();
@@ -388,10 +426,10 @@ export function ExercisePlayer({
       // Leaving the exercise (or the page) ends the running pass; this still sees the old closure.
       recordPass();
     };
-  }, [isReferenceMode, exercise.id]);
+  }, [isContinuousMode, exercise.id]);
 
   function togglePlaying() {
-    if (isReferenceMode && playing) completePassRef.current();
+    if (isContinuousMode && playing) completePassRef.current();
     if (ended) {
       setCycle((c) => c + 1);
       setPlaying(true);
@@ -483,6 +521,13 @@ export function ExercisePlayer({
     document.addEventListener('keydown', listener);
     return () => document.removeEventListener('keydown', listener);
   }, []);
+
+  // Free mode: the lane's live hit % per pitch class, null for notes not sung in this stretch.
+  function notePercentsFor(laneId: string): (number | null)[] {
+    return (passNoteTallies[laneId] ?? EMPTY_NOTE_TALLIES).map((tally) =>
+      tally.targetSeconds > 0 ? hitPercent(tally) : null
+    );
+  }
 
   return (
     <section className="exercise-panel">
@@ -578,12 +623,14 @@ export function ExercisePlayer({
               micEnabled={!micOff[lane.id]}
               onToggleMic={() => toggleLaneMic(lane.id)}
               targetMidiNumber={
-                lane.id === effectiveReferenceId
+                lane.id === effectiveReferenceId || isFreeMode
                   ? null
                   : isReferenceMode
                     ? referenceTarget
                     : targetNote?.midiNumber ?? null
               }
+              sampleWithoutTarget={isFreeMode}
+              notePercents={isFreeMode ? notePercentsFor(lane.id) : undefined}
               scoringActive={playing && !ended}
               audioInputs={audioInputs.inputs}
               onRefreshInputs={audioInputs.refresh}
@@ -615,7 +662,7 @@ export function ExercisePlayer({
           {playing ? '⏸' : '▶'}
         </button>
 
-        {!isReferenceMode && (
+        {!isContinuousMode && (
           <>
             <button
               type="button"
