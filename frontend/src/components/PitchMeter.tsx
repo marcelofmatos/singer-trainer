@@ -23,13 +23,15 @@ export interface PitchMeterProps {
   onNoteClick?: (pitchClassIndex: number) => void;
 }
 
-export interface PitchMeterHandle {
+export interface NoteNavigatorHandle {
   /**
    * Moves the keyboard selection around the wheel and focuses it. With focus outside the
    * wheel, 'next'/'previous' just enter it at the last selected note; 'first' always goes to C.
    */
   navigate(direction: 'next' | 'previous' | 'first'): void;
 }
+
+export type PitchMeterHandle = NoteNavigatorHandle;
 
 interface TrailPoint {
   id: number;
