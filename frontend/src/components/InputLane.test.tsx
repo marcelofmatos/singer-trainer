@@ -234,4 +234,28 @@ describe('InputLane', () => {
     expect(props.onNote).toHaveBeenLastCalledWith('primary', null);
     expect(props.onNote).toHaveBeenCalledTimes(2);
   });
+
+  it('samples without a target only when sampleWithoutTarget is set', () => {
+    const without = renderLane({ targetMidiNumber: null });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(without.onSample).not.toHaveBeenCalled();
+  });
+
+  it('samples every 100 ms without a target when sampleWithoutTarget is set', () => {
+    const props = renderLane({ targetMidiNumber: null, sampleWithoutTarget: true });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(props.onSample).toHaveBeenCalledTimes(3);
+    expect(props.onSample).toHaveBeenCalledWith('primary', null);
+  });
+
+  it('forwards notePercents to the wheel', () => {
+    const notePercents = Array<number | null>(12).fill(null);
+    notePercents[9] = 80;
+    renderLane({ notePercents });
+    expect(screen.getByTestId('note-percent-A').textContent).toBe('80%');
+  });
 });

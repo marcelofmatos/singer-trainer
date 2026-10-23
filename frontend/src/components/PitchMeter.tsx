@@ -21,6 +21,8 @@ export interface PitchMeterProps {
   micDisconnected: boolean;
   /** Called with the pitch class index (0=C .. 11=B) when a bubble is clicked or activated via keyboard. */
   onNoteClick?: (pitchClassIndex: number) => void;
+  /** Hit rate (0-100) per pitch class, C..B; null where the note has no data yet. */
+  notePercents?: (number | null)[];
 }
 
 export interface NoteNavigatorHandle {
@@ -52,7 +54,7 @@ const TRAIL_TICK_MS = 50; // matches the pitch tracker's own detection cadence
 const NOTE_COUNT = CHROMATIC_NOTE_NAMES.length;
 
 export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function PitchMeter(
-  { detectedNote, targetMidiNumber, micDisconnected, onNoteClick },
+  { detectedNote, targetMidiNumber, micDisconnected, onNoteClick, notePercents },
   ref
 ) {
   const targetPitchClass = targetMidiNumber !== null ? pitchClassIndex(targetMidiNumber) : null;
@@ -124,6 +126,7 @@ export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function
         const { x, y } = pointOnCircle(index * DEGREES_PER_SEMITONE, WHEEL_RADIUS, CENTER);
         const isTarget = targetPitchClass === index;
         const color = CHROMATIC_NOTE_COLORS[index];
+        const percent = notePercents?.[index] ?? null;
         return (
           <g
             key={name}
@@ -158,7 +161,7 @@ export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function
             <circle cx={x} cy={y} r={BUBBLE_RADIUS} fill={color} />
             <text
               x={x}
-              y={y}
+              y={percent === null ? y : y - 5}
               textAnchor="middle"
               dominantBaseline="central"
               fill={readableTextColor(color)}
@@ -166,6 +169,19 @@ export const PitchMeter = forwardRef<PitchMeterHandle, PitchMeterProps>(function
             >
               {name}
             </text>
+            {percent !== null && (
+              <text
+                data-testid={`note-percent-${name}`}
+                x={x}
+                y={y + 9}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fill={readableTextColor(color)}
+                fontSize="9"
+              >
+                {Math.round(percent)}%
+              </text>
+            )}
           </g>
         );
       })}

@@ -328,4 +328,19 @@ describe('PitchMeter', () => {
     fireEvent.keyDown(screen.getByTestId('note-bubble-A'), { key: ' ' });
     expect(handleClick).not.toHaveBeenCalled();
   });
+
+  it('shows the per-note percent inside the bubble that has one', () => {
+    const notePercents = Array<number | null>(12).fill(null);
+    notePercents[9] = 80;
+    render(
+      <PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} notePercents={notePercents} />
+    );
+    expect(screen.getByTestId('note-percent-A').textContent).toBe('80%');
+    expect(screen.queryByTestId('note-percent-C')).toBeNull();
+  });
+
+  it('shows no percent elements without notePercents', () => {
+    render(<PitchMeter detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
+    expect(screen.queryByTestId('note-percent-A')).toBeNull();
+  });
 });

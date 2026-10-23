@@ -34,6 +34,10 @@ export interface InputLaneProps {
   onPlayNote: (midiNumber: number) => void;
   visualization: VisualizationMode;
   wheelRef?: Ref<NoteNavigatorHandle>;
+  /** Sample even when there is no target note (free exercise). */
+  sampleWithoutTarget?: boolean;
+  /** Per-pitch-class hit rates shown on the wheel only. */
+  notePercents?: (number | null)[];
 }
 
 const SCORE_TICK_MS = 100;
@@ -60,6 +64,8 @@ export function InputLane({
   onPlayNote,
   visualization,
   wheelRef,
+  sampleWithoutTarget = false,
+  notePercents,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
   // An extra lane with no device yet waits for a choice instead of opening the system default.
@@ -102,9 +108,10 @@ export function InputLane({
   }, [lane.id, tracker.deviceId, tracker.groupId]);
 
   // Sampled on its own tick from a ref so the interval isn't re-armed on every detection update.
-  const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null; isReference: boolean }>({
+  const scoringRef = useRef<{ active: boolean; target: number | null; detected: NoteInfo | null; isReference: boolean; withoutTarget: boolean }>({
     active: false,
     isReference: false,
+    withoutTarget: false,
     target: null,
     detected: null,
   });
@@ -115,14 +122,15 @@ export function InputLane({
       target: targetMidiNumber,
       detected: tracker.currentNote,
       isReference,
+      withoutTarget: sampleWithoutTarget,
     };
     onSampleRef.current = onSample;
   });
 
   useEffect(() => {
     const intervalId = setInterval(() => {
-      const { active, target, detected: note, isReference: reference } = scoringRef.current;
-      if (!active || target === null || reference) return;
+      const { active, target, detected: note, isReference: reference, withoutTarget } = scoringRef.current;
+      if (!active || reference || (target === null && !withoutTarget)) return;
       onSampleRef.current(lane.id, note);
     }, SCORE_TICK_MS);
     return () => clearInterval(intervalId);
@@ -198,6 +206,7 @@ export function InputLane({
             detectedNote={detected}
             targetMidiNumber={targetMidiNumber}
             micDisconnected={micDisconnected}
+            notePercents={notePercents}
             onNoteClick={(pitchClass) => onPlayNote(WHEEL_OCTAVE_BASE_MIDI + pitchClass)}
           />
         )}
