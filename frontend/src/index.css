@@ -365,7 +365,8 @@ body {
 }
 
 .keyboard-help-close,
-.app-dialog-close {
+.app-dialog-close,
+.app-dialog-reset {
   margin-top: 1.25rem;
   font-family: var(--font-body);
   font-weight: 600;
@@ -380,7 +381,9 @@ body {
 .keyboard-help-close:hover,
 .keyboard-help-close:focus-visible,
 .app-dialog-close:hover,
-.app-dialog-close:focus-visible {
+.app-dialog-close:focus-visible,
+.app-dialog-reset:hover,
+.app-dialog-reset:focus-visible {
   border-color: var(--color-accent);
 }
 
@@ -388,6 +391,34 @@ body {
   max-width: min(560px, calc(100vw - 2rem));
   max-height: 80vh;
   overflow: auto;
+  /* The body holds the padding, so a click on the dialog element itself is a click on the backdrop. */
+  padding: 0;
+}
+
+.app-dialog-body {
+  padding: 1.5rem;
+}
+
+/* Pinned to the bottom of the scrolling dialog so the actions are reachable with a long history. */
+.app-dialog-actions {
+  position: sticky;
+  bottom: -1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem -1.5rem -1.5rem;
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.app-dialog-actions > button {
+  margin-top: 0;
+}
+
+.app-dialog-reset.is-armed {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
 }
 
 .score-board {

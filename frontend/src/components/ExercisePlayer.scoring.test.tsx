@@ -157,4 +157,28 @@ describe('ExercisePlayer scoring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pontuação — abrir histórico' }));
     expect(screen.getByRole('dialog', { name: 'Histórico de pontuação' })).toBeDefined();
   });
+
+  it('resets the session from the history dialog, keeping the overall score', () => {
+    tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 4, midiNumber: 60, cents: 0 } };
+    renderPlayer();
+    advance(1200);
+    fireEvent.keyDown(document.body, { key: 'h' });
+    fireEvent.click(screen.getByRole('button', { name: 'Zerar sessão' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar: zerar sessão?' }));
+    expect(screen.getByTestId('score-session-time-primary').textContent).toBe('0,0 s');
+    expect(screen.getByTestId('score-overall-percent-primary').textContent).toBe('100%');
+    expect(savedHistory()).toHaveLength(1);
+  });
+
+  it('clears the stored history from the history dialog, keeping the session', () => {
+    tracker.state = { ...tracker.state, currentNote: { noteName: 'C', octave: 4, midiNumber: 60, cents: 0 } };
+    renderPlayer();
+    advance(1200);
+    fireEvent.keyDown(document.body, { key: 'h' });
+    fireEvent.click(screen.getByRole('button', { name: 'Apagar histórico' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar: apagar histórico?' }));
+    expect(savedHistory()).toEqual([]);
+    expect(screen.getByTestId('score-overall-time-primary').textContent).toBe('0,0 s');
+    expect(screen.getByTestId('score-session-percent-primary').textContent).toBe('100%');
+  });
 });

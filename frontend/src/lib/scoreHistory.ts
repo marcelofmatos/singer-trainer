@@ -71,6 +71,14 @@ export function appendScoreRecord(record: ScoreRecord): ScoreRecord[] {
   return history;
 }
 
+export function clearScoreHistory(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable — there is nothing stored to clear.
+  }
+}
+
 export interface BestScore {
   /** `exerciseId|inputId` — unique even when two inputs share a label. */
   key: string;

@@ -30,7 +30,8 @@ quão perto você está da nota certa.
 - **Pontuação e histórico** — placar no canto superior direito com o tempo afinado (±10
   cents da nota-alvo, em qualquer oitava) e a % de acerto da sessão e geral; cada passada
   completa é gravada no navegador, e o painel de histórico (clique no placar ou H) mostra
-  os recordes por exercício e as últimas passadas.
+  os recordes por exercício e as últimas passadas. No painel, "Zerar sessão" e "Apagar
+  histórico" (com confirmação no segundo clique) recomeçam a contagem; clicar fora fecha o painel.
 - **Várias entradas** — cada entrada de áudio vira uma faixa com a própria roda, onda e
   pontuação: adicione o seu microfone, o "Monitor of …" do sistema (para captar a voz de
   um vídeo tocando em outra aba) ou outro mic, com "+ Adicionar entrada". Cada faixa tem

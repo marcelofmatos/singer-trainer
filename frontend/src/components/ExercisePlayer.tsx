@@ -41,7 +41,13 @@ import {
   type NoteTallies,
   type ScoreTally,
 } from '../lib/scoring';
-import { appendScoreRecord, loadScoreHistory, totalTallyForInput, type ScoreRecord } from '../lib/scoreHistory';
+import {
+  appendScoreRecord,
+  clearScoreHistory,
+  loadScoreHistory,
+  totalTallyForInput,
+  type ScoreRecord,
+} from '../lib/scoreHistory';
 import {
   loadPianoRollFill,
   loadVisualization,
@@ -824,7 +830,19 @@ export function ExercisePlayer({
         </button>
       </div>
       <KeyboardHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
-      <ScoreHistory open={historyOpen} onClose={() => setHistoryOpen(false)} history={history} />
+      <ScoreHistory
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        history={history}
+        onResetSession={() => {
+          setSessionTallies({});
+          resetPassTallies();
+        }}
+        onClearHistory={() => {
+          clearScoreHistory();
+          setHistory([]);
+        }}
+      />
     </section>
   );
 }

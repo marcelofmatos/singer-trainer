@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   appendScoreRecord,
   bestScores,
+  clearScoreHistory,
   freeNotePercentsByInput,
   loadScoreHistory,
   MAX_HISTORY,
@@ -31,6 +32,12 @@ describe('scoreHistory', () => {
   });
 
   it('starts empty', () => {
+    expect(loadScoreHistory()).toEqual([]);
+  });
+
+  it('clears the stored history', () => {
+    appendScoreRecord(record({ finishedAt: 1 }));
+    clearScoreHistory();
     expect(loadScoreHistory()).toEqual([]);
   });
 

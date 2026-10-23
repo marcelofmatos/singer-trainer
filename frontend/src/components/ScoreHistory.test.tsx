@@ -16,14 +16,18 @@ function record(overrides: Partial<ScoreRecord>): ScoreRecord {
   };
 }
 
+function handlers() {
+  return { onResetSession: vi.fn(), onClearHistory: vi.fn() };
+}
+
 describe('ScoreHistory', () => {
   it('is not shown while closed', () => {
-    render(<ScoreHistory open={false} onClose={() => {}} history={[]} />);
+    render(<ScoreHistory open={false} onClose={() => {}} {...handlers()} history={[]} />);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('says there is nothing yet when the history is empty', () => {
-    render(<ScoreHistory open onClose={() => {}} history={[]} />);
+    render(<ScoreHistory open onClose={() => {}} {...handlers()} history={[]} />);
     expect(screen.getByRole('dialog', { name: 'Histórico de pontuação' }).textContent).toContain(
       'Nenhuma passada completa ainda.'
     );
@@ -34,6 +38,7 @@ describe('ScoreHistory', () => {
       <ScoreHistory
         open
         onClose={() => {}}
+        {...handlers()}
         history={[
           record({ exerciseName: 'Escala Maior', finishedAt: 1, hitSeconds: 5 }),
           record({ exerciseId: 'arpejo', exerciseName: 'Arpejo Maior', finishedAt: 2, hitSeconds: 9, inputLabel: 'Monitor', inputId: 'lane-2' }),
@@ -54,6 +59,7 @@ describe('ScoreHistory', () => {
       <ScoreHistory
         open
         onClose={() => {}}
+        {...handlers()}
         history={[record({ hitSeconds: 5 }), record({ hitSeconds: 8 })]}
       />
     );
@@ -67,6 +73,7 @@ describe('ScoreHistory', () => {
       <ScoreHistory
         open
         onClose={() => {}}
+        {...handlers()}
         history={[record({ hitSeconds: 8 }), record({ inputId: 'lane-2', inputLabel: 'Monitor', hitSeconds: 2 })]}
       />
     );
@@ -84,6 +91,7 @@ describe('ScoreHistory', () => {
       <ScoreHistory
         open
         onClose={() => {}}
+        {...handlers()}
         history={[
           record({ exerciseId: 'livre', exerciseName: 'Exercício livre', noteTallies: tallies(9, 10, 8) }),
           record({
@@ -111,14 +119,46 @@ describe('ScoreHistory', () => {
   });
 
   it('has no per-note table without free exercise records', () => {
-    render(<ScoreHistory open onClose={() => {}} history={[record({})]} />);
+    render(<ScoreHistory open onClose={() => {}} {...handlers()} history={[record({})]} />);
     expect(screen.queryByRole('table', { name: 'Exercício livre — acerto por nota' })).toBeNull();
   });
 
   it('calls onClose from the close button', () => {
     const onClose = vi.fn();
-    render(<ScoreHistory open onClose={onClose} history={[]} />);
+    render(<ScoreHistory open onClose={onClose} {...handlers()} history={[]} />);
     fireEvent.click(screen.getByRole('button', { name: 'Fechar' }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Zerar sessão', 'Confirmar: zerar sessão?', 'onResetSession'],
+    ['Apagar histórico', 'Confirmar: apagar histórico?', 'onClearHistory'],
+  ] as const)('"%s" asks for a second click before acting', (label, confirmLabel, callback) => {
+    const props = handlers();
+    render(<ScoreHistory open onClose={() => {}} {...props} history={[record({})]} />);
+    fireEvent.click(screen.getByRole('button', { name: label }));
+    expect(props[callback]).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: confirmLabel }));
+    expect(props[callback]).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: label })).toBeDefined();
+  });
+
+  it('disarms a pending confirmation when the dialog closes', () => {
+    const props = handlers();
+    const { rerender } = render(<ScoreHistory open onClose={() => {}} {...props} history={[]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apagar histórico' }));
+    rerender(<ScoreHistory open={false} onClose={() => {}} {...props} history={[]} />);
+    rerender(<ScoreHistory open onClose={() => {}} {...props} history={[]} />);
+    expect(screen.getByRole('button', { name: 'Apagar histórico' })).toBeDefined();
+  });
+
+  it('closes when the backdrop outside the dialog is clicked, but not from inside it', () => {
+    const onClose = vi.fn();
+    render(<ScoreHistory open onClose={onClose} {...handlers()} history={[]} />);
+    const dialog = screen.getByRole('dialog', { name: 'Histórico de pontuação' });
+    fireEvent.click(within(dialog).getByText('Nenhuma passada completa ainda.'));
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(dialog);
     expect(onClose).toHaveBeenCalled();
   });
 });
