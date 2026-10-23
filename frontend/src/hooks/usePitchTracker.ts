@@ -165,5 +165,15 @@ export function usePitchTracker(
     };
   }, [enabled, deviceId, fallbackToDefault, reopenCount]);
 
+  // A failed open (e.g. the input was unplugged) is retried when devices change; a working stream is left alone.
+  const failed = state.status === 'error';
+  useEffect(() => {
+    const mediaDevices = navigator.mediaDevices;
+    if (!failed || !mediaDevices?.addEventListener) return;
+    const retry = () => setReopenCount((count) => count + 1);
+    mediaDevices.addEventListener('devicechange', retry);
+    return () => mediaDevices.removeEventListener('devicechange', retry);
+  }, [failed]);
+
   return state;
 }

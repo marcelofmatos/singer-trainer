@@ -71,6 +71,19 @@ export function InputLane({
   // An unplugged device isn't listed; without a placeholder the select would show another device's name.
   const deviceMissing = selectedDeviceId !== '' && !audioInputs.some((input) => input.deviceId === selectedDeviceId);
 
+  // One fixed-height slot always renders, so a message never shifts the visualization below it.
+  let statusMessage: string | null = null;
+  if (tracker.status === 'requesting') statusMessage = 'Pedindo acesso ao microfone…';
+  else if (tracker.status === 'error') {
+    statusMessage =
+      tracker.errorMessage === 'Entrada desconectada'
+        ? 'Entrada desconectada'
+        : `Erro ao acessar o microfone: ${tracker.errorMessage}`;
+  } else if (tracker.status === 'listening' && audioInputs.length === 0) {
+    statusMessage = `🎙️ ${tracker.deviceName ?? 'Microfone ativo'}`;
+  } else if (tracker.status === 'off' && !needsDevice) statusMessage = 'Mic desativado';
+  else if (needsDevice && audioInputs.length === 0) statusMessage = 'Escolha um dispositivo';
+
   // Device labels only appear once permission is granted, so re-read them when this lane opens a device.
   useEffect(() => {
     if (tracker.deviceId) onRefreshInputs();
@@ -159,19 +172,9 @@ export function InputLane({
         )}
       </div>
 
-      {tracker.status === 'requesting' && <p className="status-message">Pedindo acesso ao microfone…</p>}
-      {tracker.status === 'error' && (
-        <p className="status-message" role="alert">
-          {tracker.errorMessage === 'Entrada desconectada'
-            ? 'Entrada desconectada'
-            : `Erro ao acessar o microfone: ${tracker.errorMessage}`}
-        </p>
-      )}
-      {tracker.status === 'listening' && audioInputs.length === 0 && (
-        <p className="status-message">🎙️ {tracker.deviceName ?? 'Microfone ativo'}</p>
-      )}
-      {tracker.status === 'off' && !needsDevice && <p className="status-message">Mic desativado</p>}
-      {needsDevice && audioInputs.length === 0 && <p className="status-message">Escolha um dispositivo</p>}
+      <p className="lane-status" role={micDisconnected ? 'alert' : undefined}>
+        {statusMessage}
+      </p>
 
       <div className={`view-stage view-${visualization}${visualization === 'wheel' ? ' wheel-stage' : ''}`}>
         {visualization === 'wheel' && (

@@ -29,8 +29,8 @@ const INPUTS = [
   { deviceId: 'monitor', label: 'Monitor' },
 ];
 
-function renderLane(overrides: Partial<InputLaneProps> = {}) {
-  const props: InputLaneProps = {
+function laneProps(overrides: Partial<InputLaneProps> = {}): InputLaneProps {
+  return {
     lane: { id: 'primary', deviceId: 'usb' },
     position: 1,
     sensitivity: 0.15,
@@ -48,6 +48,10 @@ function renderLane(overrides: Partial<InputLaneProps> = {}) {
     keyboardLowMidi: 60,
     ...overrides,
   };
+}
+
+function renderLane(overrides: Partial<InputLaneProps> = {}) {
+  const props = laneProps(overrides);
   render(<InputLane {...props} />);
   return props;
 }
@@ -172,6 +176,23 @@ describe('InputLane', () => {
     tracker.state = { ...tracker.state, status: 'off', deviceId: null };
     renderLane({ micEnabled: false });
     expect(screen.getByText('Mic desativado')).toBeDefined();
+  });
+
+  it('keeps one status slot before the visualization whether or not a message shows', () => {
+    const { container, unmount } = render(<InputLane {...laneProps()} />);
+    const quietSlot = container.querySelector('.lane-status');
+    expect(quietSlot).not.toBeNull();
+    expect(quietSlot!.textContent).toBe('');
+    expect(quietSlot!.nextElementSibling?.classList.contains('view-stage')).toBe(true);
+    unmount();
+
+    tracker.state = { ...tracker.state, status: 'error', errorMessage: 'Entrada desconectada', deviceId: null };
+    const { container: errored } = render(<InputLane {...laneProps()} />);
+    const errorSlot = errored.querySelector('.lane-status');
+    expect(errorSlot).not.toBeNull();
+    expect(errorSlot!.className).toBe(quietSlot!.className);
+    expect(errorSlot!.textContent).toBe('Entrada desconectada');
+    expect(errorSlot!.nextElementSibling?.classList.contains('view-stage')).toBe(true);
   });
 
   it('renders the chosen visualization', () => {

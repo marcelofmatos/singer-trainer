@@ -7,6 +7,7 @@ let stopSpies: ReturnType<typeof vi.fn>[] = [];
 let getUserMedia: ReturnType<typeof vi.fn>;
 let trackLabel = 'USB Audio Device';
 let endedListeners: Array<() => void> = [];
+let deviceChangeListeners: Array<() => void> = [];
 // Pitch detection wants the raw signal, without the browser's voice-call processing.
 const RAW_AUDIO = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
 
@@ -28,6 +29,7 @@ describe('usePitchTracker', () => {
     stopSpies = [];
     trackLabel = 'USB Audio Device';
     endedListeners = [];
+    deviceChangeListeners = [];
     getUserMedia = vi.fn(async (constraints: { audio: { deviceId?: { exact: string } } }) => {
       const stop = vi.fn();
       stopSpies.push(stop);
@@ -44,7 +46,15 @@ describe('usePitchTracker', () => {
     });
     vi.stubGlobal('AudioContext', MockAudioContext);
     Object.defineProperty(navigator, 'mediaDevices', {
-      value: { getUserMedia },
+      value: {
+        getUserMedia,
+        addEventListener: (type: string, listener: () => void) => {
+          if (type === 'devicechange') deviceChangeListeners.push(listener);
+        },
+        removeEventListener: (type: string, listener: () => void) => {
+          if (type === 'devicechange') deviceChangeListeners = deviceChangeListeners.filter((l) => l !== listener);
+        },
+      },
       configurable: true,
     });
   });
@@ -165,5 +175,26 @@ describe('usePitchTracker', () => {
     await waitFor(() => expect(getUserMedia).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(result.current.status).toBe('listening'));
     expect(stopSpies[0]).toHaveBeenCalled();
+  });
+
+  it('reopens a failed input when devices change (replugged)', async () => {
+    getUserMedia.mockRejectedValueOnce(Object.assign(new Error('gone'), { name: 'OverconstrainedError' }));
+    const { result } = renderHook(() => usePitchTracker(0.15, true, 'usb', { fallbackToDefault: false }));
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.errorMessage).toBe('Entrada desconectada');
+    expect(deviceChangeListeners).toHaveLength(1);
+
+    act(() => deviceChangeListeners.forEach((listener) => listener()));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(deviceChangeListeners).toHaveLength(0);
+  });
+
+  it('does not reopen a listening tracker on device changes', async () => {
+    const { result } = renderHook(() => usePitchTracker(0.15, true));
+    await waitFor(() => expect(result.current.status).toBe('listening'));
+    expect(deviceChangeListeners).toHaveLength(0);
+    act(() => deviceChangeListeners.forEach((listener) => listener()));
+    expect(getUserMedia).toHaveBeenCalledTimes(1);
   });
 });
