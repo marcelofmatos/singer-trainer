@@ -808,10 +808,11 @@ export function ExercisePlayer({
           </>
         )}
 
-        <label className="speed-control">
-          Sensibilidade do microfone
+        <label className="speed-control sensitivity-control">
+          Sensibilidade
           <input
             type="range"
+            aria-label="Sensibilidade do microfone"
             min={MIN_SENSITIVITY}
             max={MAX_SENSITIVITY}
             step={SENSITIVITY_STEP}
