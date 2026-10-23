@@ -29,6 +29,8 @@ body {
   max-width: 880px;
   margin: 0 auto;
   padding: 3rem 1.5rem 4rem;
+  /* The wheel's glow bleeds past the edge; clip (unlike hidden) keeps sticky controls working. */
+  overflow-x: clip;
 }
 
 .app-header {

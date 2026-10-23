@@ -88,6 +88,12 @@ describe('InputLane', () => {
     expect(screen.getByRole('button', { name: 'Desligar microfone' })).toBeDefined();
   });
 
+  it('shows the mic icon only once in the header, on the mic toggle', () => {
+    renderLane();
+    const header = screen.getByRole('combobox', { name: 'Microfone' }).closest('.lane-header')!;
+    expect(header.textContent!.match(/🎙️/g)).toHaveLength(1);
+  });
+
   it('removes and toggles a non-primary lane through its own buttons', () => {
     const onRemove = vi.fn();
     const onToggleMic = vi.fn();

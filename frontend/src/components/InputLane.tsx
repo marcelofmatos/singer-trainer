@@ -126,7 +126,6 @@ export function InputLane({
   return (
     <div className="input-lane">
       <div className="lane-header">
-        <span aria-hidden="true">🎙️</span>
         {audioInputs.length > 0 && (
           <select
             className="mic-select"
