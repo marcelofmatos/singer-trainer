@@ -15,16 +15,19 @@ import {
   saveInputLanes,
   type InputLaneConfig,
 } from '../lib/inputLanes';
+import { MAX_LATENCY_MS } from '../lib/latency';
 import { resolveShortcut, stepWithin, type ShortcutAction } from '../lib/keyboardShortcuts';
 import type { NoteInfo } from '../lib/noteUtils';
 import {
   defaultReferenceLaneId,
   loadReferenceLaneId,
   matchesReference,
-  pushReferenceSample,
+  pushReferenceChange,
+  referenceNoteAt,
+  referenceSamplesAt,
   REFERENCE_TOLERANCE_MS,
   saveReferenceLaneId,
-  type ReferenceSample,
+  type ReferenceChange,
 } from '../lib/referenceMatch';
 import {
   addNoteSample,
@@ -79,6 +82,20 @@ const REPEATABLE_ACTIONS: ShortcutAction[] = [
 const PREVIEW_CONTEXT_LIFETIME_MS = 600;
 // Seconds each lane sample stands for; must match InputLane's 100ms scoring tick.
 const SAMPLE_SECONDS = 0.1;
+// How far back the target and reference logs reach: the largest latency, the reference tolerance and a margin.
+const LOG_KEEP_MS = MAX_LATENCY_MS + REFERENCE_TOLERANCE_MS + 1000;
+
+/** A lane sample waiting to be scored, stamped with its corrected time (Date.now() − the lane's latency). */
+interface PendingSample {
+  time: number;
+  detected: NoteInfo | null;
+}
+
+/** The exercise note sounding from `time` on, logged on each playback poll. */
+interface TargetLogEntry {
+  time: number;
+  midi: number | null;
+}
 
 export function ExercisePlayer({
   exercise,
@@ -125,8 +142,12 @@ export function ExercisePlayer({
   const [referenceLaneId, setReferenceLaneId] = useState(() => loadReferenceLaneId());
   // The reference's current semitone; only changes when the semitone does, so cents jitter doesn't re-render.
   const [referenceTarget, setReferenceTarget] = useState<number | null>(null);
-  // Notes the reference held until recently, so a late singer still hits within the tolerance.
-  const referenceHistoryRef = useRef<ReferenceSample[]>([]);
+  // What the reference heard and when (corrected by its latency), so a late singer still hits within the tolerance.
+  const referenceHistoryRef = useRef<ReferenceChange[]>([]);
+  // Exercise notes by real time; a sample is scored against the note of its corrected time.
+  const targetHistoryRef = useRef<TargetLogEntry[]>([]);
+  // Per lane, samples waiting until the target (or corrected reference) of their time is known.
+  const pendingRef = useRef<Record<string, PendingSample[]>>({});
   // The note each lane hears right now, as last reported by the lane.
   const latestNotesRef = useRef<Record<string, NoteInfo | null>>({});
   const audioInputs = useAudioInputs(null);
@@ -178,6 +199,7 @@ export function ExercisePlayer({
   );
 
   function resetPassTallies() {
+    pendingRef.current = {};
     passTalliesRef.current = {};
     setPassTallies({});
     passNoteTalliesRef.current = {};
@@ -214,11 +236,17 @@ export function ExercisePlayer({
       setElapsed(0);
       setEnded(false);
       resetPassTallies();
+      targetHistoryRef.current = [{ time: Date.now(), midi: noteAtTime(scaledExercise, 0)?.midiNumber ?? null }];
 
       pollTimer = setInterval(() => {
         if (!audioContext) return;
         const currentTime = audioContext.currentTime;
         setElapsed(currentTime);
+        const now = Date.now();
+        targetHistoryRef.current = [
+          ...targetHistoryRef.current.filter((entry) => entry.time >= now - LOG_KEEP_MS),
+          { time: now, midi: noteAtTime(scaledExercise, currentTime)?.midiNumber ?? null },
+        ];
         if (!hasEnded && currentTime >= exerciseDuration(scaledExercise)) {
           hasEnded = true;
           completePassRef.current();
@@ -245,7 +273,9 @@ export function ExercisePlayer({
     };
   }, [scaledExercise, cycle, isContinuousMode]);
 
-  const targetNote = noteAtTime(scaledExercise, elapsed);
+  // Each lane hears the exercise late by its latency, so its target is the note of its corrected time.
+  const exerciseTargetFor = (lane: InputLaneConfig) =>
+    noteAtTime(scaledExercise, elapsed - (lane.latencyMs ?? 0) / 1000)?.midiNumber ?? null;
 
   // A lane on the system default (or an alias like "default") is named after the real device it opened.
   function laneLabel(lane: InputLaneConfig, position: number): string {
@@ -280,35 +310,42 @@ export function ExercisePlayer({
     saveReferenceLaneId(effectiveReferenceId);
   }, [effectiveReferenceId, referenceLaneId, devicesListed]);
 
+  const referenceLatency = lanes.find((lane) => lane.id === effectiveReferenceId)?.latencyMs ?? 0;
+
   // Synced before the lanes' (passive) effects run, so their reports and samples see this render's values.
   const referenceIdRef = useRef(effectiveReferenceId);
-  const exerciseTargetRef = useRef<number | null>(null);
   const isFreeModeRef = useRef(isFreeMode);
+  const isReferenceModeRef = useRef(isReferenceMode);
+  const latenciesRef = useRef<Record<string, number>>({});
+  const referenceLatencyRef = useRef(referenceLatency);
   useLayoutEffect(() => {
     referenceIdRef.current = effectiveReferenceId;
     isFreeModeRef.current = isFreeMode;
-    exerciseTargetRef.current = targetNote?.midiNumber ?? null;
+    isReferenceModeRef.current = isReferenceMode;
+    latenciesRef.current = Object.fromEntries(lanes.map((lane) => [lane.id, lane.latencyMs ?? 0]));
+    referenceLatencyRef.current = referenceLatency;
   });
 
-  // A new reference starts from what it hears now, without the previous reference's notes.
+  // A new reference (or a new latency for it) starts from what it hears now, without the old log.
   useLayoutEffect(() => {
-    referenceHistoryRef.current = [];
     const note = effectiveReferenceId ? latestNotesRef.current[effectiveReferenceId] ?? null : null;
+    referenceHistoryRef.current = note
+      ? [{ time: Date.now() - referenceLatency, note: { midi: note.midiNumber, cents: note.cents } }]
+      : [];
     setReferenceTarget(note ? note.midiNumber : null);
-  }, [effectiveReferenceId]);
+  }, [effectiveReferenceId, referenceLatency]);
 
   const handleNote = useCallback((laneId: string, note: NoteInfo | null) => {
-    const previous = latestNotesRef.current[laneId] ?? null;
     latestNotesRef.current = { ...latestNotesRef.current, [laneId]: note };
     if (laneId !== referenceIdRef.current) return;
-    // The note just left still counts for the tolerance window from now on.
-    if (previous) {
-      referenceHistoryRef.current = pushReferenceSample(
-        referenceHistoryRef.current,
-        { time: Date.now(), midi: previous.midiNumber, cents: previous.cents },
-        REFERENCE_TOLERANCE_MS
-      );
-    }
+    referenceHistoryRef.current = pushReferenceChange(
+      referenceHistoryRef.current,
+      {
+        time: Date.now() - referenceLatencyRef.current,
+        note: note ? { midi: note.midiNumber, cents: note.cents } : null,
+      },
+      LOG_KEEP_MS
+    );
     setReferenceTarget(note ? note.midiNumber : null);
   }, []);
 
@@ -332,6 +369,7 @@ export function ExercisePlayer({
     setLanes((current) => current.filter((lane) => lane.id !== laneId));
     setDevicesInUse((current) => withoutLane(current, laneId));
     // Its unfinished pass goes too, so it can't leak into the session totals.
+    pendingRef.current = withoutLane(pendingRef.current, laneId);
     passTalliesRef.current = withoutLane(passTalliesRef.current, laneId);
     setPassTallies(passTalliesRef.current);
     passNoteTalliesRef.current = withoutLane(passNoteTalliesRef.current, laneId);
@@ -350,42 +388,85 @@ export function ExercisePlayer({
     setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, deviceId } : lane)));
   }
 
+  function changeLaneLatency(laneId: string, latencyMs: number) {
+    setLanes((current) => current.map((lane) => (lane.id === laneId ? { ...lane, latencyMs } : lane)));
+  }
+
   function toggleLaneMic(laneId: string) {
     setMicOff((current) => ({ ...current, [laneId]: !current[laneId] }));
   }
 
-  const handleSample = useCallback((laneId: string, detected: NoteInfo | null) => {
-    let hit: boolean;
-    if (isFreeModeRef.current) {
-      // Only time with a voice counts; the silence between phrases is neither a hit nor a miss.
-      if (!detected) return;
-      hit = isHitNearest(detected);
-      const notes = passNoteTalliesRef.current;
-      passNoteTalliesRef.current = {
-        ...notes,
-        [laneId]: addNoteSample(notes[laneId] ?? EMPTY_NOTE_TALLIES, detected.midiNumber, SAMPLE_SECONDS, hit),
-      };
-      setPassNoteTallies(passNoteTalliesRef.current);
-    } else if (referenceIdRef.current === null) {
-      hit = isHit(detected, exerciseTargetRef.current);
-    } else {
-      const now = Date.now();
-      const held = latestNotesRef.current[referenceIdRef.current] ?? null;
-      const history = held
-        ? [...referenceHistoryRef.current, { time: now, midi: held.midiNumber, cents: held.cents }]
-        : referenceHistoryRef.current;
-      hit = matchesReference(detected, history, now, REFERENCE_TOLERANCE_MS);
+  /** Whether a pending sample hit, or null when there was no target at its corrected time (not counted). */
+  function pendingHit({ time, detected }: PendingSample): boolean | null {
+    if (!isReferenceModeRef.current) {
+      // The note that was sounding at that time; a poll in the same instant is not yet heard.
+      let target: number | null = null;
+      for (const entry of targetHistoryRef.current) {
+        if (entry.time >= time) break;
+        target = entry.midi;
+      }
+      return target === null ? null : isHit(detected, target);
     }
-    const current = passTalliesRef.current;
-    passTalliesRef.current = { ...current, [laneId]: addSample(current[laneId] ?? EMPTY_TALLY, SAMPLE_SECONDS, hit) };
-    setPassTallies(passTalliesRef.current);
+    const log = referenceHistoryRef.current;
+    if (referenceIdRef.current === null || !referenceNoteAt(log, time)) return null;
+    return matchesReference(detected, referenceSamplesAt(log, time, REFERENCE_TOLERANCE_MS), time, REFERENCE_TOLERANCE_MS);
+  }
+
+  /**
+   * Scores the pending samples whose target is known by now: in the exercise at once, against the reference
+   * once its corrected log reaches the sample's time. `final` (a pass ending) drops the ones still waiting.
+   * pendingHit only reads refs, so the empty dependency list never goes stale.
+   */
+  const evaluatePending = useCallback((final: boolean) => {
+    const knownUntil = Date.now() - (isReferenceModeRef.current ? referenceLatencyRef.current : 0);
+    let tallies = passTalliesRef.current;
+    const pending: Record<string, PendingSample[]> = {};
+    for (const [laneId, queue] of Object.entries(pendingRef.current)) {
+      const waiting = queue.filter((sample) => sample.time > knownUntil);
+      if (!final && waiting.length > 0) pending[laneId] = waiting;
+      for (const sample of queue) {
+        if (sample.time > knownUntil) continue;
+        const hit = pendingHit(sample);
+        if (hit === null) continue;
+        tallies = { ...tallies, [laneId]: addSample(tallies[laneId] ?? EMPTY_TALLY, SAMPLE_SECONDS, hit) };
+      }
+    }
+    pendingRef.current = pending;
+    if (tallies === passTalliesRef.current) return;
+    passTalliesRef.current = tallies;
+    setPassTallies(tallies);
   }, []);
+
+  const handleSample = useCallback(
+    (laneId: string, detected: NoteInfo | null) => {
+      if (isFreeModeRef.current) {
+        // Only time with a voice counts; the silence between phrases is neither a hit nor a miss.
+        if (!detected) return;
+        const hit = isHitNearest(detected);
+        const notes = passNoteTalliesRef.current;
+        passNoteTalliesRef.current = {
+          ...notes,
+          [laneId]: addNoteSample(notes[laneId] ?? EMPTY_NOTE_TALLIES, detected.midiNumber, SAMPLE_SECONDS, hit),
+        };
+        setPassNoteTallies(passNoteTalliesRef.current);
+        const current = passTalliesRef.current;
+        passTalliesRef.current = { ...current, [laneId]: addSample(current[laneId] ?? EMPTY_TALLY, SAMPLE_SECONDS, hit) };
+        setPassTallies(passTalliesRef.current);
+        return;
+      }
+      const sample = { time: Date.now() - (latenciesRef.current[laneId] ?? 0), detected };
+      pendingRef.current = { ...pendingRef.current, [laneId]: [...(pendingRef.current[laneId] ?? []), sample] };
+      evaluatePending(false);
+    },
+    [evaluatePending]
+  );
 
   // Called when a pass ends (the playback poll; in continuous modes pausing, leaving or hiding the
   // page): each lane's pass moves into its session and the stored history (and leaves the live
   // pass tallies, so nothing is counted twice). The reference lane is never recorded.
   useEffect(() => {
     completePassRef.current = () => {
+      evaluatePending(true);
       const tallies = { ...passTalliesRef.current };
       const noteTallies = passNoteTalliesRef.current;
       if (effectiveReferenceId) delete tallies[effectiveReferenceId];
@@ -442,6 +523,13 @@ export function ExercisePlayer({
     } else {
       setPlaying((p) => !p);
     }
+  }
+
+  // A calibration needs silence from the exercise; continuous modes record their running stretch first.
+  function pausePlayback() {
+    if (!playing || ended) return;
+    if (isContinuousMode) completePassRef.current();
+    setPlaying(false);
   }
 
   function playNote(midiNumber: number) {
@@ -648,9 +736,15 @@ export function ExercisePlayer({
                   ? null
                   : isReferenceMode
                     ? referenceTarget
-                    : targetNote?.midiNumber ?? null
+                    : exerciseTargetFor(lane)
               }
-              sampleWithoutTarget={isFreeMode}
+              // The exercise target is already the note of the lane's corrected time; the reference's is late by its own latency.
+              targetLatencyMs={isReferenceMode ? referenceLatency : isFreeMode ? 0 : lane.latencyMs ?? 0}
+              latencyMs={lane.latencyMs ?? 0}
+              onLatencyChange={changeLaneLatency}
+              onCalibrationStart={pausePlayback}
+              // Against the reference the player decides, at the sample's corrected time, whether there was a target.
+              sampleWithoutTarget={isFreeMode || isReferenceMode}
               notePercents={isFreeMode ? notePercentsFor(lane.id) : undefined}
               scoringActive={playing && !ended}
               audioInputs={audioInputs.inputs}

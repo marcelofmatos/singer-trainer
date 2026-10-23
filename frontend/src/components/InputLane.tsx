@@ -51,6 +51,8 @@ export interface InputLaneProps {
   /** This input's latency in ms, shown and adjusted in the lane's latency panel. */
   latencyMs?: number;
   onLatencyChange?: (laneId: string, ms: number) => void;
+  /** Latency of the target given to this lane, so the piano-roll draws it at its own corrected time. */
+  targetLatencyMs?: number;
   /** Called when a calibration starts, so the player can pause the exercise. */
   onCalibrationStart?: () => void;
 }
@@ -90,6 +92,7 @@ export function InputLane({
   pianoRollFill,
   latencyMs = 0,
   onLatencyChange,
+  targetLatencyMs = 0,
   onCalibrationStart,
 }: InputLaneProps) {
   const isPrimary = lane.id === PRIMARY_LANE_ID;
@@ -340,6 +343,8 @@ export function InputLane({
             targetMidiNumber={targetMidiNumber}
             micDisconnected={micDisconnected}
             fill={pianoRollFill}
+            latencyMs={latencyMs}
+            targetLatencyMs={targetLatencyMs}
           />
         )}
       </div>

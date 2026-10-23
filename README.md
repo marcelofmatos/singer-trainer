@@ -37,6 +37,9 @@ quão perto você está da nota certa.
   seletor de dispositivo e liga/desliga; a montagem fica salva, e uma entrada
   desconectada aparece como tal até voltar. A tecla M liga/desliga o microfone da
   primeira entrada (as outras usam o próprio botão).
+- **Atraso por entrada** — botão ⏱ em cada faixa: calibre automaticamente (o app toca notas
+  de teste e mede o atraso, ideal para o "Monitor of …") ou ajuste à mão; o atraso é
+  compensado no piano-roll e na pontuação.
 - **Visualizações** — além da roda cromática (padrão, mais didática), escolha na barra do
   topo (ou com V) entre **piano-roll** (altura da voz ao longo do tempo sobre a nota-alvo),
   **afinador cromático** (nota grande e ponteiro de ±50 cents) e **teclado** de duas

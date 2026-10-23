@@ -198,6 +198,70 @@ describe('PianoRollView', () => {
     expect(labelPositions(container).every((label) => label.size === 11)).toBe(true);
   });
 
+  // The target moves from C4 to D4 at 1 s; the voice sings the same line 200 ms late in real time.
+  function renderLateVoice(latencyMs: number) {
+    const roll = (detected: number | null, target: number) => (
+      <PianoRollView
+        detectedNote={detected === null ? null : note(detected, 0)}
+        targetMidiNumber={target}
+        micDisconnected={false}
+        latencyMs={latencyMs}
+      />
+    );
+    const { rerender } = render(roll(null, 60));
+    const step = (ms: number) =>
+      act(() => {
+        vi.advanceTimersByTime(ms);
+      });
+    step(200);
+    rerender(roll(60, 60));
+    step(800);
+    rerender(roll(60, 62));
+    step(200);
+    rerender(roll(62, 62));
+    step(800);
+    const right = (element: Element) => Number(element.getAttribute('x')) + Number(element.getAttribute('width'));
+    const rowOf = (element: Element) => Number(element.getAttribute('y')) + Number(element.getAttribute('height')) / 2;
+    const c4Row = rowOf(screen.getByTestId('roll-row-60'));
+    const c4Bar = screen.getAllByTestId('roll-target').find((bar) => Math.abs(rowOf(bar) - c4Row) < 1e-6)!;
+    const c4Blocks = screen.getAllByTestId('roll-voice').filter((block) => Math.abs(rowOf(block) - c4Row) < 1e-6);
+    const tick = (360 - 34) * (50 / 6000);
+    return { c4Bar, c4Blocks, right, tick };
+  }
+
+  it('draws a late input at its corrected time, aligned with the target and coloured against it', () => {
+    const { c4Bar, c4Blocks, right, tick } = renderLateVoice(200);
+    const statuses = screen.getAllByTestId('roll-voice').map((block) => block.getAttribute('data-status'));
+    expect(statuses.every((status) => status === 'in-tune')).toBe(true);
+    expect(Math.abs(right(c4Blocks[c4Blocks.length - 1]) - right(c4Bar))).toBeLessThanOrEqual(tick + 1e-6);
+    expect(Math.abs(Number(c4Blocks[0].getAttribute('x')) - Number(c4Bar.getAttribute('x')))).toBeLessThanOrEqual(tick + 1e-6);
+  });
+
+  it('without the latency, the same late input runs past the target and is marked off there', () => {
+    const { c4Bar, c4Blocks, right, tick } = renderLateVoice(0);
+    expect(right(c4Blocks[c4Blocks.length - 1]) - right(c4Bar)).toBeGreaterThan(3 * tick);
+    expect(screen.getAllByTestId('roll-voice').some((block) => block.getAttribute('data-status') === 'off')).toBe(true);
+  });
+
+  it('draws the target at its own corrected time', () => {
+    const roll = (target: number) => (
+      <PianoRollView detectedNote={null} targetMidiNumber={target} micDisconnected={false} targetLatencyMs={300} />
+    );
+    const { rerender } = render(roll(60));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    rerender(roll(62));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const bars = screen.getAllByTestId('roll-target');
+    const last = bars[bars.length - 1];
+    const rightEdge = Number(last.getAttribute('x')) + Number(last.getAttribute('width'));
+    // The newest target reading is 300 ms old: it ends 300 ms (5% of the 6 s window) before the right edge.
+    expect(rightEdge).toBeCloseTo(360 - (360 - 34) * (300 / 6000), 0);
+  });
+
   it('shows the sung note above the roll, and the mic icon when the mic fails', () => {
     const { rerender } = render(<PianoRollView detectedNote={note(69, 4)} targetMidiNumber={69} micDisconnected={false} />);
     expect(screen.getByTestId('sung-note').textContent).toBe('A4');

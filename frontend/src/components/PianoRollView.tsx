@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { CHROMATIC_NOTE_COLORS, pitchClassIndex, readableTextColor } from '../lib/chromaticWheel';
-import { appendSample, pitchRange, voiceBlocks, type RollSample } from '../lib/pianoRoll';
-import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
+import {
+  appendSample,
+  pitchRange,
+  voiceBlocks,
+  voiceSamples,
+  type TargetReading,
+  type VoiceReading,
+} from '../lib/pianoRoll';
+import { STATUS_COLORS } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
 import { SungNoteReadout } from './SungNoteReadout';
 import { noteLabel } from './TunerView';
@@ -12,6 +19,10 @@ export interface PianoRollViewProps {
   micDisconnected: boolean;
   /** How much of its note row each voice block fills, 0 (thin line at the exact pitch) to 1 (whole row). */
   fill?: number;
+  /** This input's latency: what it hears now is drawn this many ms in the past. */
+  latencyMs?: number;
+  /** The target's own latency: the target given now is drawn this many ms in the past. */
+  targetLatencyMs?: number;
 }
 
 const WINDOW_MS = 6000;
@@ -36,42 +47,64 @@ function labeledRows(rows: number[], rowHeight: number, fontSize: number): Set<n
   return labeled;
 }
 
-/** Pitch over time: target as bars, voice as blocks colored by tuning, last 6 seconds. */
-export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected, fill = 1 }: PianoRollViewProps) {
-  const latestRef = useRef({ detectedNote, targetMidiNumber });
+/**
+ * Pitch over time: target as bars, voice as blocks colored by tuning, last 6 seconds. Voice and target are
+ * kept apart, each at its corrected time, so a late input lines up with the target it was singing.
+ */
+export function PianoRollView({
+  detectedNote,
+  targetMidiNumber,
+  micDisconnected,
+  fill = 1,
+  latencyMs = 0,
+  targetLatencyMs = 0,
+}: PianoRollViewProps) {
+  const latestRef = useRef({ detectedNote, targetMidiNumber, latencyMs, targetLatencyMs });
   useEffect(() => {
-    latestRef.current = { detectedNote, targetMidiNumber };
+    latestRef.current = { detectedNote, targetMidiNumber, latencyMs, targetLatencyMs };
   });
 
-  const [samples, setSamples] = useState<RollSample[]>([]);
+  const [roll, setRoll] = useState<{ now: number; voices: VoiceReading[]; targets: TargetReading[] }>({
+    now: 0,
+    voices: [],
+    targets: [],
+  });
   useEffect(() => {
     const startedAt = Date.now();
     const intervalId = setInterval(() => {
-      const { detectedNote: note, targetMidiNumber: target } = latestRef.current;
-      const sample: RollSample = {
-        time: Date.now() - startedAt,
-        voice: note ? note.midiNumber + note.cents / 100 : null,
-        target,
-        status: statusForPitch(note, target),
-      };
-      setSamples((current) => appendSample(current, sample, WINDOW_MS));
+      const latest = latestRef.current;
+      const now = Date.now() - startedAt;
+      setRoll((current) => ({
+        now,
+        voices: appendSample(current.voices, { time: now - latest.latencyMs, note: latest.detectedNote }, WINDOW_MS),
+        targets: appendSample(
+          current.targets,
+          { time: now - latest.targetLatencyMs, target: latest.targetMidiNumber },
+          WINDOW_MS
+        ),
+      }));
     }, TICK_MS);
     return () => clearInterval(intervalId);
   }, []);
 
-  const { low, high } = pitchRange(samples);
+  const { now } = roll;
+  // Corrected times reach back past the window's left edge; only what fits in it is drawn.
+  const targets = roll.targets.filter((reading) => reading.time >= now - WINDOW_MS);
+  const samples = voiceSamples(roll.voices, roll.targets).filter((sample) => sample.time >= now - WINDOW_MS);
+  const { low, high } = pitchRange([
+    ...samples,
+    ...targets.map(({ time, target }) => ({ time, voice: null, target, status: null })),
+  ]);
   const rowHeight = HEIGHT / (high - low + 1);
-  const now = samples.length > 0 ? samples[samples.length - 1].time : 0;
   const x = (time: number) => LABEL_WIDTH + ((time - (now - WINDOW_MS)) / WINDOW_MS) * (WIDTH - LABEL_WIDTH);
   const y = (midi: number) => (high - midi) * rowHeight + rowHeight / 2;
 
-
   // Consecutive samples with the same target form one bar.
   const targetBars: { start: number; end: number; midi: number }[] = [];
-  samples.forEach((entry, index) => {
+  targets.forEach((entry, index) => {
     if (entry.target !== null) {
       const last = targetBars[targetBars.length - 1];
-      if (last && last.midi === entry.target && samples[index - 1]?.target === entry.target) last.end = entry.time;
+      if (last && last.midi === entry.target && targets[index - 1]?.target === entry.target) last.end = entry.time;
       else targetBars.push({ start: entry.time, end: entry.time, midi: entry.target });
     }
   });

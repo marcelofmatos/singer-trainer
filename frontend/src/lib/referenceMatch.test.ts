@@ -3,19 +3,53 @@ import {
   defaultReferenceLaneId,
   loadReferenceLaneId,
   matchesReference,
-  pushReferenceSample,
+  pushReferenceChange,
+  referenceNoteAt,
+  referenceSamplesAt,
   REFERENCE_TOLERANCE_MS,
   saveReferenceLaneId,
 } from './referenceMatch';
 
 const note = (midiNumber: number, cents: number) => ({ noteName: 'X', octave: 0, midiNumber, cents });
 
-describe('pushReferenceSample', () => {
-  it('keeps only samples inside the window', () => {
-    let history = pushReferenceSample([], { time: 0, midi: 60, cents: 0 }, 500);
-    history = pushReferenceSample(history, { time: 400, midi: 62, cents: 0 }, 500);
-    history = pushReferenceSample(history, { time: 900, midi: 64, cents: 0 }, 500);
-    expect(history.map((sample) => sample.midi)).toEqual([62, 64]);
+describe('reference change log', () => {
+  const C = { midi: 60, cents: 0 };
+  const D = { midi: 62, cents: 5 };
+  // C from 1000 to 1300, D from 1300 to 1600, silence from 1600, E from 2000 on.
+  const log = [
+    { time: 1000, note: C },
+    { time: 1300, note: D },
+    { time: 1600, note: null },
+    { time: 2000, note: { midi: 64, cents: 0 } },
+  ];
+
+  it('keeps the changes still relevant to the window, including the one in force at its start', () => {
+    let history = pushReferenceChange([], { time: 0, note: C }, 500);
+    history = pushReferenceChange(history, { time: 400, note: D }, 500);
+    history = pushReferenceChange(history, { time: 900, note: null }, 500);
+    expect(history.map((change) => change.time)).toEqual([0, 400, 900]);
+    history = pushReferenceChange(history, { time: 1000, note: C }, 500);
+    expect(history.map((change) => change.time)).toEqual([400, 900, 1000]);
+  });
+
+  it('tells the note in force at a time', () => {
+    expect(referenceNoteAt(log, 999)).toBeNull();
+    expect(referenceNoteAt(log, 1000)).toEqual(C);
+    expect(referenceNoteAt(log, 1450)).toEqual(D);
+    expect(referenceNoteAt(log, 1800)).toBeNull();
+  });
+
+  it('lists the notes heard in the tolerance window before a time, stamped with when they stopped', () => {
+    expect(referenceSamplesAt(log, 1400, 500)).toEqual([
+      { time: 1300, midi: 60, cents: 0 },
+      { time: 1400, midi: 62, cents: 5 },
+    ]);
+    expect(referenceSamplesAt(log, 1900, 500)).toEqual([{ time: 1600, midi: 62, cents: 5 }]);
+  });
+
+  it('ignores notes that only start after the time', () => {
+    expect(referenceSamplesAt(log, 1200, 500)).toEqual([{ time: 1200, midi: 60, cents: 0 }]);
+    expect(referenceSamplesAt(log, 1999, 300)).toEqual([]);
   });
 });
 

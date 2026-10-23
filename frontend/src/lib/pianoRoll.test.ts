@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appendSample, pitchRange, voiceBlocks, type RollSample } from './pianoRoll';
+import { appendSample, pitchRange, targetAt, voiceBlocks, voiceSamples, type RollSample } from './pianoRoll';
 import type { TuningStatus } from './tuningGauge';
 
 const sample = (time: number, voice: number | null, target: number | null): RollSample => ({
@@ -14,6 +14,11 @@ describe('appendSample', () => {
     let samples: RollSample[] = [];
     for (let time = 0; time <= 7000; time += 1000) samples = appendSample(samples, sample(time, 60, 60), 6000);
     expect(samples.map((entry) => entry.time)).toEqual([1000, 2000, 3000, 4000, 5000, 6000, 7000]);
+  });
+
+  it('replaces the readings at or after a new one, so a latency raised mid-stream keeps time moving forward', () => {
+    const samples = [sample(100, 60, 60), sample(150, 60, 60), sample(200, 60, 60)];
+    expect(appendSample(samples, sample(120, 62, 62), 6000).map((entry) => entry.time)).toEqual([100, 120]);
   });
 });
 
@@ -101,5 +106,51 @@ describe('voiceBlocks', () => {
       (block) => block.status
     );
     expect(statuses).toEqual(['in-tune', 'close', 'off']);
+  });
+});
+
+describe('targetAt', () => {
+  const targets = [
+    { time: 100, target: 60 },
+    { time: 200, target: null },
+    { time: 300, target: 62 },
+  ];
+
+  it('is the last target reading at or before the time', () => {
+    expect(targetAt(targets, 150)).toBe(60);
+    expect(targetAt(targets, 250)).toBeNull();
+    expect(targetAt(targets, 300)).toBe(62);
+    expect(targetAt(targets, 900)).toBe(62);
+  });
+
+  it('is null before the first reading', () => {
+    expect(targetAt(targets, 50)).toBeNull();
+    expect(targetAt([], 50)).toBeNull();
+  });
+});
+
+describe('voiceSamples', () => {
+  const note = (midiNumber: number, cents = 0) => ({ noteName: 'X', octave: 0, midiNumber, cents });
+
+  it('colours each voice reading against the target of its own time', () => {
+    const voices = [
+      { time: 100, note: note(60) },
+      { time: 200, note: note(60) },
+      { time: 300, note: null },
+    ];
+    const targets = [
+      { time: 100, target: 60 },
+      { time: 150, target: 64 },
+    ];
+    expect(voiceSamples(voices, targets)).toEqual([
+      { time: 100, voice: 60, target: null, status: 'in-tune' },
+      { time: 200, voice: 60, target: null, status: 'off' },
+      { time: 300, voice: null, target: null, status: null },
+    ]);
+  });
+
+  it('falls back to the nearest-note status without a target', () => {
+    expect(voiceSamples([{ time: 100, note: note(60, 30) }], [])[0].status).toBe('off');
+    expect(voiceSamples([{ time: 100, note: note(60, 3) }], [{ time: 200, target: 64 }])[0].status).toBe('in-tune');
   });
 });

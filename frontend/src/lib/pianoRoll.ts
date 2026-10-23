@@ -1,4 +1,5 @@
-import type { TuningStatus } from './tuningGauge';
+import type { NoteInfo } from './noteUtils';
+import { statusForPitch, type TuningStatus } from './tuningGauge';
 
 export interface RollSample {
   /** Milliseconds (monotonic). */
@@ -9,8 +10,41 @@ export interface RollSample {
   status: TuningStatus | null;
 }
 
-export function appendSample(samples: RollSample[], sample: RollSample, windowMs: number): RollSample[] {
-  return [...samples, sample].filter((entry) => entry.time >= sample.time - windowMs);
+/** What the input heard, stamped with its corrected time (ms). */
+export interface VoiceReading {
+  time: number;
+  note: NoteInfo | null;
+}
+
+/** The target, stamped with its own corrected time (ms). */
+export interface TargetReading {
+  time: number;
+  target: number | null;
+}
+
+/** Appends within the window; readings at or after the new one are superseded (a raised latency moves time back). */
+export function appendSample<T extends { time: number }>(samples: T[], sample: T, windowMs: number): T[] {
+  return [...samples.filter((entry) => entry.time >= sample.time - windowMs && entry.time < sample.time), sample];
+}
+
+/** The target at `time`: the last reading at or before it, null before the first one. */
+export function targetAt(targets: TargetReading[], time: number): number | null {
+  let target: number | null = null;
+  for (const reading of targets) {
+    if (reading.time > time) break;
+    target = reading.target;
+  }
+  return target;
+}
+
+/** Voice readings as roll samples, each coloured against the target of its own time (nearest note without one). */
+export function voiceSamples(voices: VoiceReading[], targets: TargetReading[]): RollSample[] {
+  return voices.map(({ time, note }) => ({
+    time,
+    voice: note ? note.midiNumber + note.cents / 100 : null,
+    target: null,
+    status: statusForPitch(note, targetAt(targets, time)),
+  }));
 }
 
 const MARGIN = 2;
