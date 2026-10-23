@@ -136,7 +136,6 @@ export function InputLane({
   useEffect(() => {
     onNoteRef.current(lane.id, reportedNote);
     // reportedNote is keyed by value (midi, cents) so a new object with the same pitch doesn't re-report.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lane.id, tracker.status, reportedNote?.midiNumber, reportedNote?.cents]);
 
   return (
