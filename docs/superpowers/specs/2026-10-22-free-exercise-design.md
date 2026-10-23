@@ -1,6 +1,18 @@
 # Exercício livre — Spec
 
-Depende de "Pontuação e histórico" (`2026-10-22-score-and-history-design.md`).
+Depende de "Pontuação e histórico", "Várias entradas" e "Entrada de áudio".
+
+> **Revisão (2026-10-23)** — ajustada ao app atual (várias entradas, modos de visualização,
+> exercício "Entrada de áudio"):
+> - Vale **por faixa**: cada entrada é medida contra a nota mais próxima, tem a sua % por
+>   nota e grava o seu registro (como "cada roda pontua sozinha").
+> - A **velocidade continua** na barra (sem efeito aqui), como o Marcelo pediu; somem só o
+>   som de referência (🔊) e "Repetir".
+> - A gravação reaproveita os gatilhos do modo "Entrada de áudio" (pausar, trocar de
+>   exercício, ocultar/fechar a página).
+> - A % por nota aparece nas bolhas da **roda**; os outros modos de visualização ficam como
+>   estão (já medem contra a nota mais próxima quando não há alvo).
+> - Histórico: a seção por nota vira uma grade **C…B × entradas**.
 
 ## Contexto
 
@@ -26,14 +38,15 @@ Decisões validadas:
   colorido pela afinação em relação à nota mais próxima (comportamento atual quando não
   há alvo).
 - Controles: ficam **Play/pausa** (pausa a contagem e grava o trecho), microfone,
-  seletor de mic, sensibilidade e ajuda. Somem: som de referência, velocidade e repetir
-  (não se aplicam).
+  seletor de mic, sensibilidade, velocidade (sem efeito) e ajuda. Somem: som de referência
+  e repetir.
 - **% por nota na roda**: abaixo do nome de cada nota aparece a % de acerto daquela nota
   no trecho atual (vazio enquanto a nota não foi cantada).
 - **Placar**: o trecho em andamento entra ao vivo na sessão e no geral, como uma passada.
 - **Histórico**: registros do livre aparecem como "Exercício livre". O painel ganha a
-  seção **"Exercício livre — acerto por nota"**, com a % de cada nota somando todos os
-  registros do livre.
+  seção **"Exercício livre — acerto por nota"**: uma grade com as colunas C…B e uma linha
+  por entrada, com a % de cada nota somando os registros do livre daquela entrada ("—"
+  para nota nunca cantada).
 
 ## Regras de contagem (livre)
 
@@ -47,18 +60,22 @@ Decisões validadas:
 
 ## Design
 
-- `exercises.ts`: `Exercise` ganha `mode?: 'free'`; novo `FREE_EXERCISE` em
-  `BUILTIN_EXERCISES` (sem notas).
+- `exercises.ts`: `Exercise.mode` passa a `'reference' | 'free'`; novo `FREE_EXERCISE`
+  (id `livre`, sem notas) em `BUILTIN_EXERCISES`.
 - `scoring.ts`: `isHitNearest(detected)` (±10 cents da nota mais próxima) e
   `NoteTallies = ScoreTally[12]` com `addNoteSample`.
 - `scoreHistory.ts`: `ScoreRecord` ganha `noteTallies?: ScoreTally[]` (validado se
-  presente); `freeNotePercents(history)` agrega por nota os registros do livre.
+  presente, 12 posições); `freeNotePercentsByInput(history)` agrega por entrada e por nota
+  os registros do livre.
 - `PitchMeter`: prop opcional `notePercents?: (number | null)[]` (12 posições) renderizada
   em texto pequeno dentro da bolha, abaixo do nome.
-- `ExercisePlayer`: no modo livre não toca referência nem roda o relógio do exercício;
-  amostra a pontuação livre; grava nos gatilhos acima; esconde os controles que não se
-  aplicam.
-- `ScoreHistory`: seção "Exercício livre — acerto por nota".
+- `InputLane`: prop `sampleWithoutTarget` (no livre, amostra mesmo sem alvo) e
+  `notePercents` repassada à roda.
+- `ExercisePlayer`: modos "contínuos" (`reference` e `free`) compartilham: sem tom/relógio,
+  gravação ao pausar/sair/ocultar, 🔊 e Repetir escondidos. No livre: só conta com voz,
+  acerto por `isHitNearest`, contagem por nota por faixa (estado + ref), `noteTallies` no
+  registro e `notePercents` para a roda de cada faixa.
+- `ScoreHistory`: seção "Exercício livre — acerto por nota" (grade notas × entradas).
 
 ## Testes
 
