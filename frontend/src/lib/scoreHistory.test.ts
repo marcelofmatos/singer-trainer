@@ -83,8 +83,8 @@ describe('scoreHistory', () => {
       record({ exerciseId: 'a', exerciseName: 'A', inputId: 'lane-2', inputLabel: 'Monitor', targetSeconds: 4, hitSeconds: 1 }),
     ];
     expect(bestScores(history)).toEqual([
-      { exerciseName: 'A', inputLabel: null, percent: 80 },
-      { exerciseName: 'A', inputLabel: 'Monitor', percent: 25 },
+      { key: 'a|primary', exerciseName: 'A', inputLabel: null, percent: 80 },
+      { key: 'a|lane-2', exerciseName: 'A', inputLabel: 'Monitor', percent: 25 },
     ]);
   });
 

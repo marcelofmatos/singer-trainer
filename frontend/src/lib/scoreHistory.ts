@@ -54,6 +54,8 @@ export function appendScoreRecord(record: ScoreRecord): ScoreRecord[] {
 }
 
 export interface BestScore {
+  /** `exerciseId|inputId` — unique even when two inputs share a label. */
+  key: string;
   exerciseName: string;
   /** null for the primary lane. */
   inputLabel: string | null;
@@ -70,6 +72,7 @@ export function bestScores(history: ScoreRecord[]): BestScore[] {
     const current = best.get(key);
     if (!current || percent > current.percent) {
       best.set(key, {
+        key,
         exerciseName: entry.exerciseName,
         inputLabel: inputId === PRIMARY_INPUT_ID ? null : (entry.inputLabel ?? null),
         percent,

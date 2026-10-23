@@ -38,7 +38,7 @@ export function ScoreHistory({ open, onClose, history }: ScoreHistoryProps) {
             <caption>Recordes</caption>
             <tbody>
               {bestScores(history).map((score) => (
-                <tr key={`${score.exerciseName}|${score.inputLabel ?? ''}`}>
+                <tr key={score.key}>
                   <th scope="row">
                     {score.exerciseName}
                     {score.inputLabel ? ` · ${score.inputLabel}` : ''}
