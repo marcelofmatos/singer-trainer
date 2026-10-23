@@ -28,7 +28,8 @@ Decisões validadas:
   Somem os botões de som (🔊) e "Repetir"; a velocidade continua na barra (sem efeito aqui).
 - Na coluna da esquerda, abaixo da descrição: `<select aria-label="Referência">` com as
   faixas pelo nome. Padrão: a primeira faixa cujo dispositivo começa com "Monitor of"; se
-  não houver, a última faixa extra; se só existir a faixa principal, a mensagem
+  não houver, a primeira faixa extra (o padrão é salvo assim que os nomes dos dispositivos
+  aparecem, para que adicionar uma entrada depois não troque a referência); se só existir a faixa principal, a mensagem
   "Adicione uma entrada (ex.: Monitor of …) para usar como referência." e nada é pontuado.
   A escolha fica salva (`singer-trainer:reference-lane`).
 - A faixa de referência mostra um selo **"Referência"** no cabeçalho, a própria

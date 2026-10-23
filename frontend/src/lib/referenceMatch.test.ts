@@ -47,9 +47,9 @@ describe('defaultReferenceLaneId', () => {
   const labelOf = (laneId: string) =>
     ({ primary: 'USB Mic', 'lane-2': 'JBL', 'lane-3': 'Monitor of JBL' })[laneId] ?? '';
 
-  it('prefers a "Monitor of" lane, then the last extra lane, never the primary', () => {
+  it('prefers a "Monitor of" lane, then the first extra lane, never the primary', () => {
     expect(defaultReferenceLaneId(['primary', 'lane-2', 'lane-3'], labelOf)).toBe('lane-3');
-    expect(defaultReferenceLaneId(['primary', 'lane-2'], labelOf)).toBe('lane-2');
+    expect(defaultReferenceLaneId(['primary', 'lane-2', 'lane-4'], labelOf)).toBe('lane-2');
     expect(defaultReferenceLaneId(['primary'], labelOf)).toBeNull();
   });
 });

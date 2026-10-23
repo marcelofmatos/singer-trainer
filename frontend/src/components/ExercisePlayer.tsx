@@ -245,6 +245,14 @@ export function ExercisePlayer({
           laneLabelById
         );
 
+  // Pin the resolved default once device labels are known, so adding an input later can't move the reference.
+  const devicesListed = audioInputs.inputs.length > 0;
+  useEffect(() => {
+    if (!effectiveReferenceId || effectiveReferenceId === referenceLaneId || !devicesListed) return;
+    setReferenceLaneId(effectiveReferenceId);
+    saveReferenceLaneId(effectiveReferenceId);
+  }, [effectiveReferenceId, referenceLaneId, devicesListed]);
+
   // Synced before the lanes' (passive) effects run, so their reports and samples see this render's values.
   const referenceIdRef = useRef(effectiveReferenceId);
   const exerciseTargetRef = useRef<number | null>(null);

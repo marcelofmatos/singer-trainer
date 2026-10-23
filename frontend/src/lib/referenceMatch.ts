@@ -34,10 +34,13 @@ export function matchesReference(
   });
 }
 
-/** First lane whose device looks like a system monitor, else the last extra lane; never the primary. */
+/**
+ * First lane whose device looks like a system monitor, else the first extra lane (new lanes are
+ * appended, so adding one doesn't move this fallback); never the primary.
+ */
 export function defaultReferenceLaneId(laneIds: string[], labelOf: (laneId: string) => string): string | null {
   const extras = laneIds.slice(1);
-  return extras.find((laneId) => labelOf(laneId).startsWith('Monitor of')) ?? extras[extras.length - 1] ?? null;
+  return extras.find((laneId) => labelOf(laneId).startsWith('Monitor of')) ?? extras[0] ?? null;
 }
 
 export function loadReferenceLaneId(): string | null {

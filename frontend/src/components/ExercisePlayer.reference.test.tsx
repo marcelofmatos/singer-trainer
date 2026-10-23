@@ -140,6 +140,33 @@ describe('ExercisePlayer reference mode', () => {
     expect(screen.queryByTestId('score-session-percent-lane-2')).toBeNull();
   });
 
+  it('keeps the default reference when another input is added later', async () => {
+    trackers.stereo = { ...base, deviceId: 'stereo' };
+    storeLanes([
+      { id: 'primary', deviceId: 'mic' },
+      { id: 'lane-2', deviceId: 'stereo' },
+    ]);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        enumerateDevices: vi.fn(async () => [
+          { deviceId: 'mic', label: 'USB Mic', kind: 'audioinput' },
+          { deviceId: 'stereo', label: 'Stereo Mix', kind: 'audioinput' },
+          { deviceId: 'monitor', label: 'Monitor of JBL', kind: 'audioinput' },
+        ]),
+        addEventListener() {},
+        removeEventListener() {},
+      },
+      configurable: true,
+    });
+    renderPlayer();
+    await flush();
+    expect((screen.getByRole('combobox', { name: 'Referência' }) as HTMLSelectElement).value).toBe('lane-2');
+    fireEvent.click(screen.getByRole('button', { name: '+ Adicionar entrada' }));
+    await flush();
+    expect((screen.getByRole('combobox', { name: 'Referência' }) as HTMLSelectElement).value).toBe('lane-2');
+    expect(localStorage.getItem('singer-trainer:reference-lane')).toBe('lane-2');
+  });
+
   it('remembers the chosen reference lane', async () => {
     renderPlayer();
     await flush();
