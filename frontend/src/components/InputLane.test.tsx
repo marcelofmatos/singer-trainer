@@ -20,17 +20,29 @@ const tracker: { state: PitchTrackerState } = {
 const calibration = vi.hoisted(() => ({
   // Onsets relative to the moment the sequence is scheduled.
   offsets: [100, 600, 1100, 1600, 2100, 2600],
+  // The audio context's state each time the sequence was scheduled.
+  statesAtPlay: [] as string[],
 }));
 
 vi.mock('../audio/calibrationTone', () => ({
-  playCalibrationSequence: vi.fn((_context: AudioContext, now: () => number) =>
-    calibration.offsets.map((offset) => now() + offset)
-  ),
+  playCalibrationSequence: vi.fn((context: AudioContext, now: () => number) => {
+    calibration.statesAtPlay.push(context.state);
+    return calibration.offsets.map((offset) => now() + offset);
+  }),
 }));
 
+const audio = { throwOnCreate: false, resumeRuns: true };
 const closeContext = vi.fn(() => Promise.resolve());
+// Starts suspended, like a fresh context whose audio thread hasn't started yet.
 class MockAudioContext {
+  state: AudioContextState = 'suspended';
   close = closeContext;
+  constructor() {
+    if (audio.throwOnCreate) throw new Error('no audio output');
+  }
+  resume = vi.fn(async () => {
+    if (audio.resumeRuns) this.state = 'running';
+  });
 }
 
 vi.mock('../hooks/usePitchTracker', () => ({
@@ -87,6 +99,9 @@ describe('InputLane', () => {
     vi.useFakeTimers();
     vi.stubGlobal('AudioContext', MockAudioContext);
     closeContext.mockClear();
+    calibration.statesAtPlay.length = 0;
+    audio.throwOnCreate = false;
+    audio.resumeRuns = true;
   });
 
   afterEach(() => {
@@ -328,15 +343,23 @@ describe('InputLane', () => {
       expect(onLatencyChange).toHaveBeenCalledWith('lane-2', 250);
     });
 
-    it('calibrates from the test notes this lane detects', () => {
+    async function clickCalibrate() {
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      });
+    }
+
+    it('calibrates from the test notes this lane detects', async () => {
       const onLatencyChange = vi.fn();
       const onCalibrationStart = vi.fn();
       const props = laneProps({ onLatencyChange, onCalibrationStart });
       const { rerender } = render(<InputLane {...props} />);
       fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      await clickCalibrate();
 
       expect(onCalibrationStart).toHaveBeenCalledTimes(1);
+      // Scheduled only once the audio clock runs, so the onsets aren't mapped from a frozen clock.
+      expect(calibration.statesAtPlay).toEqual(['running']);
       expect(screen.getByText('Calibrando…')).toBeDefined();
       expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(true);
 
@@ -367,25 +390,71 @@ describe('InputLane', () => {
       expect(closeContext).toHaveBeenCalled();
     });
 
-    it('reports a failure and keeps the latency when nothing was detected', () => {
+    it('reports a failure and keeps the latency when nothing was detected', async () => {
       const onLatencyChange = vi.fn();
       renderLane({ onLatencyChange });
       fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      await clickCalibrate();
+      // Listens until the last onset plus the detection window, no longer.
       act(() => {
-        vi.advanceTimersByTime(5000);
+        vi.advanceTimersByTime(2600 + 1000 - 1);
+      });
+      expect(screen.getByText('Calibrando…')).toBeDefined();
+      act(() => {
+        vi.advanceTimersByTime(1);
       });
       expect(onLatencyChange).not.toHaveBeenCalled();
       expect(screen.getByText('Não foi possível calibrar: a entrada não captou as notas de teste.')).toBeDefined();
       expect(closeContext).toHaveBeenCalled();
     });
 
-    it('closes the calibration audio when unmounted mid-run', () => {
+    it('closes the calibration audio when unmounted mid-run', async () => {
       const { unmount } = render(<InputLane {...laneProps()} />);
       fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+      await clickCalibrate();
       unmount();
       expect(closeContext).toHaveBeenCalled();
+    });
+
+    it('fails without playing when the audio clock does not start', async () => {
+      audio.resumeRuns = false;
+      const onLatencyChange = vi.fn();
+      renderLane({ onLatencyChange });
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      await clickCalibrate();
+      expect(calibration.statesAtPlay).toEqual([]);
+      expect(screen.getByText('Não foi possível calibrar: não foi possível tocar as notas de teste.')).toBeDefined();
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(false);
+      expect(closeContext).toHaveBeenCalled();
+      act(() => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(onLatencyChange).not.toHaveBeenCalled();
+    });
+
+    it('reports when the test notes cannot be played', async () => {
+      audio.throwOnCreate = true;
+      renderLane();
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      await clickCalibrate();
+      expect(screen.getByText('Não foi possível calibrar: não foi possível tocar as notas de teste.')).toBeDefined();
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it.each(['off', 'error'] as const)('disables calibration with a hint when the input is %s', (status) => {
+      tracker.state = { ...tracker.state, status, deviceId: null };
+      renderLane();
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.getByText('Ligue a entrada para calibrar.')).toBeDefined();
+    });
+
+    it('disables calibration without a hint while the input is opening', () => {
+      tracker.state = { ...tracker.state, status: 'requesting' };
+      renderLane();
+      fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
+      expect((screen.getByRole('button', { name: 'Calibrar' }) as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.queryByText('Ligue a entrada para calibrar.')).toBeNull();
     });
   });
 });

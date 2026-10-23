@@ -5,7 +5,6 @@ import { usePitchTracker } from '../hooks/usePitchTracker';
 import type { AudioInput } from '../hooks/useAudioInputs';
 import { PRIMARY_LANE_ID, type InputLaneConfig } from '../lib/inputLanes';
 import {
-  CALIBRATION_NOTE_MS,
   CALIBRATION_NOTES,
   DETECTION_WINDOW_MS,
   MAX_LATENCY_MS,
@@ -61,6 +60,8 @@ const SCORE_TICK_MS = 100;
 // The wheel is octave-agnostic, so a clicked bubble previews in this fixed octave (C4-B4).
 const WHEEL_OCTAVE_BASE_MIDI = 60;
 const CALIBRATION_FAILED = 'Não foi possível calibrar: a entrada não captou as notas de teste.';
+const CALIBRATION_PLAY_FAILED = 'Não foi possível calibrar: não foi possível tocar as notas de teste.';
+const CALIBRATION_NEEDS_INPUT = 'Ligue a entrada para calibrar.';
 
 interface Detection {
   time: number;
@@ -180,7 +181,10 @@ export function InputLane({
   const [calibrationStatus, setCalibrationStatus] = useState<string | null>(null);
   // Non-null only while a calibration runs: every note change this lane hears, timestamped.
   const detectionsRef = useRef<Detection[] | null>(null);
-  const calibrationRef = useRef<{ context: AudioContext; timeoutId: ReturnType<typeof setTimeout> } | null>(null);
+  // The running calibration; timeoutId stays null until its audio clock has started.
+  const calibrationRef = useRef<{ context: AudioContext; timeoutId: ReturnType<typeof setTimeout> | null } | null>(
+    null
+  );
   const onLatencyChangeRef = useRef(onLatencyChange);
   useEffect(() => {
     onLatencyChangeRef.current = onLatencyChange;
@@ -194,29 +198,48 @@ export function InputLane({
     () => () => {
       const run = calibrationRef.current;
       if (!run) return;
-      clearTimeout(run.timeoutId);
+      calibrationRef.current = null;
+      if (run.timeoutId !== null) clearTimeout(run.timeoutId);
       void run.context.close();
     },
     []
   );
 
-  function startCalibration() {
+  async function startCalibration() {
     onCalibrationStart?.();
-    const context = new AudioContext();
-    const onsets = playCalibrationSequence(context, Date.now).map((time, index) => ({
-      time,
-      midi: CALIBRATION_NOTES[index],
-    }));
-    detectionsRef.current = [];
     setCalibrating(true);
     setCalibrationStatus('Calibrando…');
+    let context: AudioContext | null = null;
+    let onsets: { time: number; midi: number }[];
+    try {
+      context = new AudioContext();
+      calibrationRef.current = { context, timeoutId: null };
+      // A fresh context's clock may be frozen until its audio thread starts; onsets mapped
+      // from it before then would be early and inflate the measured latency.
+      await context.resume();
+      if (calibrationRef.current?.context !== context) return; // unmounted meanwhile
+      if (context.state !== 'running') throw new Error('audio clock did not start');
+      onsets = playCalibrationSequence(context, Date.now).map((time, index) => ({
+        time,
+        midi: CALIBRATION_NOTES[index],
+      }));
+    } catch {
+      if (context && calibrationRef.current?.context !== context) return; // unmounted meanwhile
+      calibrationRef.current = null;
+      void context?.close();
+      setCalibrating(false);
+      setCalibrationStatus(CALIBRATION_PLAY_FAILED);
+      return;
+    }
+    detectionsRef.current = [];
+    const playing = context;
     // Listen until the last note has had its full detection window.
-    const waitMs = onsets[onsets.length - 1].time + CALIBRATION_NOTE_MS + DETECTION_WINDOW_MS - Date.now();
+    const waitMs = onsets[onsets.length - 1].time + DETECTION_WINDOW_MS - Date.now();
     const timeoutId = setTimeout(() => {
       const measured = estimateLatency(onsets, detectionsRef.current ?? []);
       detectionsRef.current = null;
       calibrationRef.current = null;
-      void context.close();
+      void playing.close();
       setCalibrating(false);
       if (measured === null) {
         setCalibrationStatus(CALIBRATION_FAILED);
@@ -225,8 +248,12 @@ export function InputLane({
       onLatencyChangeRef.current?.(lane.id, measured);
       setCalibrationStatus(`Atraso medido: ${measured} ms`);
     }, waitMs);
-    calibrationRef.current = { context, timeoutId };
+    calibrationRef.current = { context: playing, timeoutId };
   }
+
+  const inputListening = tracker.status === 'listening';
+  const inputOff = tracker.status === 'off' || tracker.status === 'error';
+  const latencyStatus = !calibrating && inputOff ? CALIBRATION_NEEDS_INPUT : calibrationStatus;
 
   return (
     <div className="input-lane">
@@ -300,11 +327,16 @@ export function InputLane({
               />
               <span className="lane-latency-value">{latencyMs} ms</span>
             </label>
-            <button type="button" className="lane-calibrate" onClick={startCalibration} disabled={calibrating}>
+            <button
+              type="button"
+              className="lane-calibrate"
+              onClick={() => void startCalibration()}
+              disabled={calibrating || !inputListening}
+            >
               Calibrar
             </button>
             <p className="lane-latency-status" aria-live="polite">
-              {calibrationStatus}
+              {latencyStatus}
             </p>
           </div>
         )}

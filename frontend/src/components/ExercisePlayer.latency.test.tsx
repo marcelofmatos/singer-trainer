@@ -216,6 +216,8 @@ describe('ExercisePlayer input latency', () => {
     expect(screen.getByRole('button', { name: 'Pausar' })).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Atraso da entrada' }));
     fireEvent.click(screen.getByRole('button', { name: 'Calibrar' }));
+    // The calibration starts its audio asynchronously; let it settle inside act.
+    await flush();
     expect(screen.getByRole('button', { name: 'Retomar' })).toBeDefined();
   });
 });
