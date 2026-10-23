@@ -3,6 +3,7 @@ import { pitchClassIndex } from '../lib/chromaticWheel';
 import { appendSample, pitchRange, type RollSample } from '../lib/pianoRoll';
 import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
+import { SungNoteReadout } from './SungNoteReadout';
 import { noteLabel } from './TunerView';
 
 export interface PianoRollViewProps {
@@ -70,72 +71,73 @@ export function PianoRollView({ detectedNote, targetMidiNumber, micDisconnected 
   const rows = Array.from({ length: high - low + 1 }, (_, index) => high - index);
 
   return (
-    <svg
-      className={micDisconnected ? 'piano-roll is-disconnected' : 'piano-roll'}
-      viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
-      width="100%"
-      role="img"
-      aria-label="Piano-roll"
-    >
-      {rows.map((midi) => (
-        <g key={midi}>
+    <div className={micDisconnected ? 'piano-roll-view is-disconnected' : 'piano-roll-view'}>
+      <SungNoteReadout
+        detectedNote={detectedNote}
+        targetMidiNumber={targetMidiNumber}
+        micDisconnected={micDisconnected}
+      />
+      <svg className="piano-roll" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="img" aria-label="Piano-roll">
+        {rows.map((midi) => (
+          <g key={midi}>
+            <rect
+              x={LABEL_WIDTH}
+              y={y(midi) - rowHeight / 2}
+              width={WIDTH - LABEL_WIDTH}
+              height={rowHeight}
+              fill={BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 'rgba(255,255,255,0.03)' : 'transparent'}
+            />
+            {pitchClassIndex(midi) === 0 && (
+              <text x={2} y={y(midi)} dominantBaseline="central" fontSize="9" fill="var(--color-text-muted)">
+                {noteLabel(midi)}
+              </text>
+            )}
+          </g>
+        ))}
+        {targetBars.map((bar) => (
           <rect
-            x={LABEL_WIDTH}
-            y={y(midi) - rowHeight / 2}
-            width={WIDTH - LABEL_WIDTH}
+            key={`${bar.start}-${bar.midi}`}
+            data-testid="roll-target"
+            x={x(bar.start)}
+            y={y(bar.midi) - rowHeight / 2}
+            width={Math.max(2, x(bar.end) - x(bar.start))}
             height={rowHeight}
-            fill={BLACK_PITCH_CLASSES.has(pitchClassIndex(midi)) ? 'rgba(255,255,255,0.03)' : 'transparent'}
+            rx={2}
+            fill="var(--color-accent-soft)"
+            stroke="var(--color-accent)"
+            strokeWidth={1}
           />
-          {pitchClassIndex(midi) === 0 && (
-            <text x={2} y={y(midi)} dominantBaseline="central" fontSize="9" fill="var(--color-text-muted)">
-              {noteLabel(midi)}
-            </text>
-          )}
-        </g>
-      ))}
-      {targetBars.map((bar) => (
-        <rect
-          key={`${bar.start}-${bar.midi}`}
-          data-testid="roll-target"
-          x={x(bar.start)}
-          y={y(bar.midi) - rowHeight / 2}
-          width={Math.max(2, x(bar.end) - x(bar.start))}
-          height={rowHeight}
-          rx={2}
-          fill="var(--color-accent-soft)"
-          stroke="var(--color-accent)"
-          strokeWidth={1}
-        />
-      ))}
-      {voiceRuns.map((run) => {
-        const status = run[run.length - 1].status;
-        const color = status ? STATUS_COLORS[status] : '#ffffff';
-        // A run may start with the previous run's last point, but each sample ends at most one run.
-        const key = run[run.length - 1].time;
-        return run.length === 1 ? (
-          <circle
-            key={key}
-            data-testid="roll-voice"
-            data-status={status ?? undefined}
-            cx={x(run[0].time)}
-            cy={y(run[0].voice!)}
-            r={2}
-            fill={color}
-          />
-        ) : (
-          <polyline
-            key={key}
-            data-testid="roll-voice"
-            data-status={status ?? undefined}
-            points={run.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}
-            fill="none"
-            stroke={color}
-            strokeWidth={2.5}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-          />
-        );
-      })}
-    </svg>
+        ))}
+        {voiceRuns.map((run) => {
+          const status = run[run.length - 1].status;
+          const color = status ? STATUS_COLORS[status] : '#ffffff';
+          // A run may start with the previous run's last point, but each sample ends at most one run.
+          const key = run[run.length - 1].time;
+          return run.length === 1 ? (
+            <circle
+              key={key}
+              data-testid="roll-voice"
+              data-status={status ?? undefined}
+              cx={x(run[0].time)}
+              cy={y(run[0].voice!)}
+              r={2}
+              fill={color}
+            />
+          ) : (
+            <polyline
+              key={key}
+              data-testid="roll-voice"
+              data-status={status ?? undefined}
+              points={run.map((entry) => `${x(entry.time)},${y(entry.voice!)}`).join(' ')}
+              fill="none"
+              stroke={color}
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          );
+        })}
+      </svg>
+    </div>
   );
 }

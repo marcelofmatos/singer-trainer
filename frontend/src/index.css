@@ -614,14 +614,17 @@ body {
   text-align: right;
 }
 
-.keyboard-center {
+.sung-note-readout {
   display: flex;
   flex-direction: column;
   align-items: center;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Fixed line heights keep the keyboard still while the note comes and goes. */
-.keyboard-center-note {
+/* Fixed line heights keep the view below still while the note comes and goes. */
+.sung-note {
   min-height: 2.4rem;
   line-height: 2.4rem;
   font-family: var(--font-display);
@@ -629,7 +632,7 @@ body {
   font-weight: 600;
 }
 
-.keyboard-cents {
+.sung-note-cents {
   min-height: 1.1rem;
   line-height: 1.1rem;
 }

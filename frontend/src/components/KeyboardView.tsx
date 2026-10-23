@@ -4,6 +4,7 @@ import { isBlackKey, keyboardOffsetPercent } from '../lib/keyboardWindow';
 import { STATUS_COLORS, statusForPitch } from '../lib/tuningGauge';
 import type { NoteInfo } from '../lib/noteUtils';
 import type { NoteNavigatorHandle } from './PitchMeter';
+import { SungNoteReadout } from './SungNoteReadout';
 import { noteLabel } from './TunerView';
 
 export interface KeyboardViewProps {
@@ -21,11 +22,6 @@ const WHITE_KEY_WIDTH = 20;
 const BLACK_KEY_WIDTH = 12;
 const WHITE_KEY_HEIGHT = 80;
 const BLACK_KEY_HEIGHT = 50;
-
-function formatCents(cents: number): string {
-  const rounded = Math.round(cents);
-  return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded)} ¢`;
-}
 
 // White keys are laid out left to right; black keys sit over the boundary to their left.
 let whiteIndex = -1;
@@ -98,24 +94,11 @@ export const KeyboardView = forwardRef<NoteNavigatorHandle, KeyboardViewProps>(f
             <span data-testid="keyboard-out-of-range">{`◀ ${noteLabel(sungMidi)}`}</span>
           )}
         </span>
-        <div className="keyboard-center">
-          {micDisconnected ? (
-            <span data-testid="mic-disconnected-icon" className="keyboard-center-note" aria-hidden="true">
-              🎤🚫
-            </span>
-          ) : (
-            <span
-              data-testid="keyboard-center-note"
-              className="keyboard-center-note"
-              style={status ? { color: STATUS_COLORS[status] } : undefined}
-            >
-              {detectedNote ? noteLabel(detectedNote.midiNumber) : ''}
-            </span>
-          )}
-          <span data-testid="keyboard-cents" className="keyboard-cents">
-            {detectedNote && !micDisconnected ? formatCents(detectedNote.cents) : ''}
-          </span>
-        </div>
+        <SungNoteReadout
+          detectedNote={detectedNote}
+          targetMidiNumber={targetMidiNumber}
+          micDisconnected={micDisconnected}
+        />
         <span className="keyboard-out-of-range-slot">
           {outOfRange && sungMidi > HIGH_MIDI && (
             <span data-testid="keyboard-out-of-range">{`${noteLabel(sungMidi)} ▶`}</span>

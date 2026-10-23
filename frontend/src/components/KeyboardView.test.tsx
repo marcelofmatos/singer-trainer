@@ -82,19 +82,19 @@ describe('KeyboardView', () => {
 
   it('shows the sung note and octave in the center, in the tuning color, with the cents below', () => {
     renderKeyboard({ targetMidiNumber: 70, detectedNote: note(70, 12) });
-    const label = screen.getByTestId('keyboard-center-note');
+    const label = screen.getByTestId('sung-note');
     expect(label.textContent).toBe('A#4');
     expect(label.style.color).toBe(hexToRgb(STATUS_COLORS.close));
-    expect(screen.getByTestId('keyboard-cents').textContent).toBe('+12 ¢');
+    expect(screen.getByTestId('sung-note-cents').textContent).toBe('+12 ¢');
   });
 
   it('leaves the center empty in silence and shows the mic icon when the mic fails', () => {
     const { rerender } = renderKeyboard();
-    expect(screen.getByTestId('keyboard-center-note').textContent).toBe('');
-    expect(screen.getByTestId('keyboard-cents').textContent).toBe('');
+    expect(screen.getByTestId('sung-note').textContent).toBe('');
+    expect(screen.getByTestId('sung-note-cents').textContent).toBe('');
     rerender({ micDisconnected: true, detectedNote: note(70, 12) });
     expect(screen.getByTestId('mic-disconnected-icon').textContent).toBe('🎤🚫');
-    expect(screen.queryByTestId('keyboard-center-note')).toBeNull();
+    expect(screen.queryByTestId('sung-note')).toBeNull();
   });
 
   it('outlines the target key and lights the sung key with its status', () => {

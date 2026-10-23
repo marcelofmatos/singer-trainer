@@ -96,4 +96,16 @@ describe('PianoRollView', () => {
     render(<PianoRollView detectedNote={null} targetMidiNumber={null} micDisconnected={false} />);
     expect(screen.getByText('C4')).toBeDefined();
   });
+
+  it('shows the sung note above the roll, and the mic icon when the mic fails', () => {
+    const { rerender } = render(<PianoRollView detectedNote={note(69, 4)} targetMidiNumber={69} micDisconnected={false} />);
+    expect(screen.getByTestId('sung-note').textContent).toBe('A4');
+    expect(screen.getByTestId('sung-note-cents').textContent).toBe('+4 ¢');
+    expect(screen.getByTestId('sung-note').compareDocumentPosition(screen.getByRole('img', { name: 'Piano-roll' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    rerender(<PianoRollView detectedNote={note(69, 4)} targetMidiNumber={69} micDisconnected />);
+    expect(screen.getByTestId('mic-disconnected-icon').textContent).toBe('🎤🚫');
+    expect(screen.queryByTestId('sung-note')).toBeNull();
+  });
 });
